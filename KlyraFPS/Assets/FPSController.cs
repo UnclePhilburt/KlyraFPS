@@ -72,7 +72,7 @@ public class FPSController : NetworkBehaviour
     private bool isAiming = false;
     private Camera playerCamera;
 
-    // SyncVars (replaces NetworkVariables)
+    // SyncVars for animation (position/rotation handled by NetworkTransformReliable)
     [SyncVar] private float syncedMoveSpeed;
     [SyncVar] private bool syncedIsGrounded = true;
     [SyncVar] private bool syncedIsJumping;
@@ -80,10 +80,14 @@ public class FPSController : NetworkBehaviour
     [SyncVar] private int syncedCurrentGait;
     [SyncVar] private float syncedStrafeX;
     [SyncVar] private float syncedStrafeZ;
-    [SyncVar] private Vector3 syncedPosition;
-    [SyncVar] private float syncedRotationY;
 
     private bool isInitialized = false;
+
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+        Debug.Log($"[SERVER] Player spawned - netId: {netId}, connId: {connectionToClient?.connectionId}");
+    }
 
     public override void OnStartLocalPlayer()
     {
@@ -143,23 +147,16 @@ public class FPSController : NetworkBehaviour
         }
 
         // CRITICAL: Remote players must NOT have camera references
-        if (!isOwned)
+        if (!isLocalPlayer)
         {
             cameraTransform = null;
             playerCamera = null;
             weaponTransform = null;  // Remote players don't need first-person weapon
             isInitialized = true;
-            Debug.Log($"Remote player {netId} spawned at {transform.position} - camera cleared");
+            Debug.Log($">>> REMOTE PLAYER SPAWNED - netId: {netId}, position: {transform.position}");
         }
 
         StartCoroutine(InitializePlayerModel());
-
-        // Initialize syncedPosition to current spawn position to prevent teleporting
-        if (isServer)
-        {
-            syncedPosition = transform.position;
-            syncedRotationY = transform.eulerAngles.y;
-        }
     }
 
     System.Collections.IEnumerator InitializePlayerModel()
@@ -204,21 +201,17 @@ public class FPSController : NetworkBehaviour
 
         if (!isLocalPlayer)
         {
-            // Disable controller for remote players
+            // Disable CharacterController for remote players - NetworkTransformReliable handles position
             if (controller == null) controller = GetComponent<CharacterController>();
             if (controller != null && controller.enabled) controller.enabled = false;
-
-            // Apply synced position/rotation from owner (manual sync workaround)
-            // Use direct assignment for position to avoid lag, keep slerp for smooth rotation
-            transform.position = syncedPosition;
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, syncedRotationY, 0f), Time.deltaTime * 20f);
 
             // Log remote player position occasionally for debugging
             if (Time.frameCount % 300 == 0)
             {
-                Debug.Log($"Remote player {netId} at {transform.position}, synced: {syncedPosition}");
+                Debug.Log($"Remote player {netId} at {transform.position}");
             }
 
+            // NetworkTransformReliable handles position/rotation sync automatically
             UpdateRemoteAnimator();
             return;
         }
@@ -297,13 +290,6 @@ public class FPSController : NetworkBehaviour
         }
     }
 
-    [Command]
-    void CmdUpdatePosition(Vector3 position, float yRotation)
-    {
-        syncedPosition = position;
-        syncedRotationY = yRotation;
-    }
-
     void ReadInput()
     {
         var keyboard = Keyboard.current;
@@ -375,15 +361,14 @@ public class FPSController : NetworkBehaviour
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
 
-        // Update synced values
+        // Update synced values for animation
         syncedMoveSpeed = animatorSpeed;
         syncedIsGrounded = controller.isGrounded;
         syncedMovementInputHeld = isMoving;
         syncedStrafeX = moveX;
         syncedStrafeZ = moveZ;
 
-        // Manual position sync via Command (NetworkTransform authority issue workaround)
-        CmdUpdatePosition(transform.position, rotationY);
+        // Position/rotation sync handled by NetworkTransformReliable component
 
         if (!isMoving)
             syncedCurrentGait = 0;

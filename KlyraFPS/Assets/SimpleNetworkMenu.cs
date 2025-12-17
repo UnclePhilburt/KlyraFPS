@@ -225,6 +225,10 @@ public class SimpleNetworkMenu : MonoBehaviour
         Debug.Log($"Starting server on port {serverPort}...");
         NetworkManager.singleton.StartServer();
         Debug.Log($"NetworkManager.StartServer() called - Active: {NetworkServer.active}");
+
+        // Add server event logging
+        NetworkServer.OnConnectedEvent += conn => Debug.Log($"[SERVER] Client connected: {conn.connectionId}");
+        NetworkServer.OnDisconnectedEvent += conn => Debug.Log($"[SERVER] Client disconnected: {conn.connectionId}");
     }
 
     void Update()
