@@ -168,7 +168,8 @@ public class FPSController : NetworkBehaviour
 
         animator = GetComponentInChildren<Animator>();
 
-        if (isOwned)
+        // Only hide body mesh for the LOCAL player (first-person view)
+        if (isLocalPlayer)
         {
             SkinnedMeshRenderer[] skinnedRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
             foreach (var renderer in skinnedRenderers)
@@ -196,20 +197,21 @@ public class FPSController : NetworkBehaviour
     void Update()
     {
         // Wait for network initialization
-        if (!isOwned && !isInitialized)
+        if (!isLocalPlayer && !isInitialized)
         {
             return;
         }
 
-        if (!isOwned)
+        if (!isLocalPlayer)
         {
             // Disable controller for remote players
             if (controller == null) controller = GetComponent<CharacterController>();
             if (controller != null && controller.enabled) controller.enabled = false;
 
             // Apply synced position/rotation from owner (manual sync workaround)
-            transform.position = Vector3.Lerp(transform.position, syncedPosition, Time.deltaTime * 15f);
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, syncedRotationY, 0f), Time.deltaTime * 15f);
+            // Use direct assignment for position to avoid lag, keep slerp for smooth rotation
+            transform.position = syncedPosition;
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, syncedRotationY, 0f), Time.deltaTime * 20f);
 
             // Log remote player position occasionally for debugging
             if (Time.frameCount % 300 == 0)
@@ -275,7 +277,8 @@ public class FPSController : NetworkBehaviour
 
     void LateUpdate()
     {
-        if (isOwned)
+        // Use isLocalPlayer instead of isOwned to ensure only THIS client's player controls the camera
+        if (isLocalPlayer)
         {
             transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
 
@@ -286,11 +289,10 @@ public class FPSController : NetworkBehaviour
                 cameraTransform.rotation = Quaternion.Euler(rotationX, rotationY, 0f);
             }
 
-            // Debug log every 5 seconds - include authority status for NetworkTransform debugging
+            // Debug log every 5 seconds
             if (Time.frameCount % 300 == 0)
             {
-                var nt = GetComponent<NetworkTransformReliable>();
-                Debug.Log($"LOCAL player {netId} - pos: {transform.position}, rotY: {rotationY}, authority: {authority}");
+                Debug.Log($"LOCAL player {netId} - pos: {transform.position}, rotY: {rotationY}, isLocalPlayer: {isLocalPlayer}");
             }
         }
     }
