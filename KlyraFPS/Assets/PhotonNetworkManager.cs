@@ -20,6 +20,9 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
     {
         // Ensure we can sync scenes
         PhotonNetwork.AutomaticallySyncScene = true;
+
+        // Force a specific region so all players connect to the same server
+        PhotonNetwork.PhotonServerSettings.AppSettings.FixedRegion = "us";
     }
 
     void InitializeStyles()
@@ -84,6 +87,7 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
         GUILayout.Space(10);
         GUILayout.Label($"Room: {PhotonNetwork.CurrentRoom.Name}", labelStyle);
         GUILayout.Label($"Players: {PhotonNetwork.CurrentRoom.PlayerCount}", labelStyle);
+        GUILayout.Label($"Region: {PhotonNetwork.CloudRegion}", labelStyle);
         GUILayout.Space(20);
 
         if (GUILayout.Button("DISCONNECT", buttonStyle, GUILayout.Height(60)))
@@ -122,6 +126,9 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
         // Join or create a room
         RoomOptions roomOptions = new RoomOptions();
         roomOptions.MaxPlayers = 10;
+        roomOptions.IsVisible = true;
+        roomOptions.IsOpen = true;
+        Debug.Log($"Attempting to join room 'KlyraFPS_Room' in region: {PhotonNetwork.CloudRegion}");
         PhotonNetwork.JoinOrCreateRoom("KlyraFPS_Room", roomOptions, TypedLobby.Default);
     }
 
@@ -148,6 +155,16 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
         Debug.Log($"Disconnected: {cause}");
         isConnecting = false;
         statusMessage = "Disconnected: " + cause;
+    }
+
+    public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
+    {
+        Debug.Log($"Player {newPlayer.NickName} (ID: {newPlayer.ActorNumber}) joined the room. Total players: {PhotonNetwork.CurrentRoom.PlayerCount}");
+    }
+
+    public override void OnPlayerLeftRoom(Photon.Realtime.Player otherPlayer)
+    {
+        Debug.Log($"Player {otherPlayer.NickName} (ID: {otherPlayer.ActorNumber}) left the room. Total players: {PhotonNetwork.CurrentRoom.PlayerCount}");
     }
 
     void SpawnPlayer()

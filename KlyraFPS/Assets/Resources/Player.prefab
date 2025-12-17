@@ -1170,8 +1170,8 @@ MonoBehaviour:
   mouseSensitivity: 2
   maxLookAngle: 80
   cameraTransform: {fileID: 0}
-  muzzlePoint: {fileID: 0}
-  weaponTransform: {fileID: 0}
+  muzzlePoint: {fileID: 5423015928478004015}
+  weaponTransform: {fileID: 1295011499322129942}
   cameraHeight: 1.6
   weaponOffset: {x: 0.15, y: -0.33, z: 0.22}
   bobFrequency: 10

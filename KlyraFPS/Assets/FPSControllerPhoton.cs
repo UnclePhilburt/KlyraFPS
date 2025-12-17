@@ -75,10 +75,25 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     private bool isInitialized = false;
 
+    // Static reference to ensure only one local player
+    private static FPSControllerPhoton localPlayerInstance;
+
     void Start()
     {
         controller = GetComponent<CharacterController>();
         animator = GetComponentInChildren<Animator>();
+
+        // Disable any cameras that came with the prefab FIRST
+        // This prevents multiple cameras from being active
+        Camera[] prefabCameras = GetComponentsInChildren<Camera>();
+        foreach (Camera cam in prefabCameras)
+        {
+            Debug.Log($"Disabling prefab camera: {cam.name} on player {photonView.ViewID}");
+            cam.enabled = false;
+            // Also disable AudioListener if present
+            AudioListener listener = cam.GetComponent<AudioListener>();
+            if (listener != null) listener.enabled = false;
+        }
 
         if (photonView.IsMine)
         {
@@ -94,6 +109,26 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     {
         Debug.Log($"Initializing LOCAL player (ViewID: {photonView.ViewID})");
 
+        // Ensure only one local player exists
+        if (localPlayerInstance != null && localPlayerInstance != this)
+        {
+            Debug.LogWarning($"Another local player already exists! This player (ViewID: {photonView.ViewID}) will be treated as remote.");
+            InitializeRemotePlayer();
+            return;
+        }
+        localPlayerInstance = this;
+
+        // Destroy any existing player cameras first
+        Camera[] allCameras = FindObjectsOfType<Camera>();
+        foreach (Camera cam in allCameras)
+        {
+            if (cam.gameObject.name.StartsWith("PlayerCamera_"))
+            {
+                Debug.Log($"Destroying old player camera: {cam.gameObject.name}");
+                Destroy(cam.gameObject);
+            }
+        }
+
         // Setup camera
         Camera mainCam = Camera.main;
         if (mainCam != null)
@@ -106,15 +141,39 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             playerCamera.farClipPlane = 1000f;
             cameraTransform = camObj.transform;
 
+            // Add AudioListener
+            camObj.AddComponent<AudioListener>();
+
             // Copy settings from main camera
             playerCamera.clearFlags = mainCam.clearFlags;
             playerCamera.backgroundColor = mainCam.backgroundColor;
             playerCamera.cullingMask = mainCam.cullingMask;
 
-            // Disable the scene camera
+            // Disable the scene camera completely
             mainCam.gameObject.SetActive(false);
+        }
+        else
+        {
+            // No main camera, create one anyway
+            Debug.LogWarning("No main camera found, creating camera from scratch");
+            GameObject camObj = new GameObject($"PlayerCamera_{photonView.ViewID}");
+            playerCamera = camObj.AddComponent<Camera>();
+            playerCamera.fieldOfView = normalFOV;
+            playerCamera.nearClipPlane = 0.1f;
+            playerCamera.farClipPlane = 1000f;
+            playerCamera.clearFlags = CameraClearFlags.Skybox;
+            cameraTransform = camObj.transform;
+            camObj.AddComponent<AudioListener>();
+        }
 
-            DontDestroyOnLoad(camObj);
+        // Disable AudioListener on main camera if it exists
+        AudioListener[] listeners = FindObjectsOfType<AudioListener>();
+        foreach (AudioListener listener in listeners)
+        {
+            if (listener.gameObject != cameraTransform?.gameObject)
+            {
+                listener.enabled = false;
+            }
         }
 
         // Initialize rotation from current transform
@@ -130,6 +189,8 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
         currentWeaponOffset = weaponOffset;
         isInitialized = true;
+
+        Debug.Log($"Local player initialized. Camera: {playerCamera?.name}, IsMine: {photonView.IsMine}");
     }
 
     void InitializeRemotePlayer()
@@ -479,8 +540,14 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     void OnDestroy()
     {
+        // Clear static reference if this was the local player
+        if (localPlayerInstance == this)
+        {
+            localPlayerInstance = null;
+        }
+
         // Cleanup camera
-        if (photonView.IsMine && cameraTransform != null)
+        if (photonView != null && photonView.IsMine && cameraTransform != null)
         {
             Destroy(cameraTransform.gameObject);
         }
