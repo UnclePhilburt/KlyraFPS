@@ -1,0 +1,794 @@
+================================================================================
+SUPER DETAILED SETUP GUIDE - EVERY SINGLE STEP
+================================================================================
+
+I'm going to explain EVERYTHING. Follow along exactly.
+
+================================================================================
+PART 1: OPENING UNITY AND THE DEMO SCENE
+================================================================================
+
+1. Open Unity Hub (the application with the Unity logo)
+
+2. Find "KlyraFPS" project in your list
+   - Click on it ONCE to open the project
+   - Unity Editor will launch (this takes 30-60 seconds)
+
+3. Wait for Unity to finish loading
+   - You'll see a progress bar at the bottom
+   - When it's done, you'll see the Unity interface
+
+4. Understanding the Unity Interface:
+
+   Your screen is divided into sections (called "windows"):
+
+   - TOP CENTER: Toolbar with Play/Pause buttons
+   - LEFT SIDE: "Hierarchy" window (list of objects in current scene)
+   - CENTER: "Scene" view (3D view of your game)
+   - RIGHT SIDE: "Inspector" window (shows details of selected object)
+   - BOTTOM: "Project" window (shows all your files/assets)
+   - BOTTOM: "Console" window (shows errors/messages)
+
+5. Open the Project Window (if not visible):
+   - At the very top menu bar
+   - Click: Window
+   - Click: General
+   - Click: Project
+   - The Project window appears at the bottom
+
+6. Navigate to the Demo Scene:
+
+   In the Project window (bottom of screen):
+
+   a) You'll see a folder structure on the left side
+
+   b) Click the little arrow next to "Assets" folder
+      - It expands to show folders inside
+
+   c) Click the arrow next to "Synty" folder
+      - It expands
+
+   d) Click the arrow next to "PolygonMilitary" folder
+      - It expands
+
+   e) Click on the "Scenes" folder (single click)
+      - The right side shows files in that folder
+
+   f) You should see "Demo" with a Unity icon
+      - DOUBLE-CLICK "Demo"
+
+   g) The scene loads in the center view
+      - You should see a military base environment
+
+7. Save the scene to make sure it's open:
+   - Top menu: File > Save
+   - Or press: Ctrl+S
+
+================================================================================
+PART 2: CREATING THE PLAYER PREFAB
+================================================================================
+
+STEP 2A: FIND THE SOLDIER MODEL
+--------------------------------
+
+1. In the Project window (bottom), navigate to the soldier models:
+
+   a) Look at the folder tree on the left side
+
+   b) Make sure these are expanded (click arrows if not):
+      - Assets
+      - Synty
+      - PolygonMilitary
+
+   c) Click the arrow next to "Prefabs" folder
+
+   d) Click the arrow next to "Characters" folder
+
+   e) SINGLE CLICK on "Characters" folder
+      - The right side now shows soldier models
+
+2. Find "SM_Chr_Soldier_Male_01":
+
+   - In the right side of Project window
+   - Scroll through the list
+   - Find one that says "SM_Chr_Soldier_Male_01"
+   - It has a small 3D model preview icon
+
+STEP 2B: ADD SOLDIER TO SCENE
+------------------------------
+
+3. Drag the soldier into your scene:
+
+   a) LEFT-CLICK and HOLD on "SM_Chr_Soldier_Male_01"
+
+   b) DRAG your mouse up to the Hierarchy window (left side)
+
+   c) RELEASE the mouse button
+
+   d) You should now see "SM_Chr_Soldier_Male_01" appear in the Hierarchy list
+
+4. Look at the Scene view (center):
+   - You should see a soldier character standing there
+   - If you don't see it, click on "SM_Chr_Soldier_Male_01" in Hierarchy
+
+STEP 2C: RENAME IT TO "PLAYER"
+-------------------------------
+
+5. Rename the soldier to "Player":
+
+   a) In the Hierarchy window (left side)
+
+   b) SINGLE-CLICK on "SM_Chr_Soldier_Male_01"
+      - It highlights in blue
+
+   c) Press F2 on your keyboard
+      - Or RIGHT-CLICK and select "Rename"
+
+   d) The name becomes editable (highlighted)
+
+   e) TYPE: Player
+
+   f) Press ENTER
+
+   g) It's now called "Player"
+
+STEP 2D: ADD CHARACTER CONTROLLER COMPONENT
+--------------------------------------------
+
+6. With "Player" selected in Hierarchy, look at the Inspector (right side):
+
+   a) You should see "Player" at the top
+
+   b) Below that are sections like "Transform", "Animator", etc.
+
+   c) Scroll to the BOTTOM of the Inspector
+
+   d) Click the "Add Component" button
+      - A search box appears
+
+7. Add Character Controller:
+
+   a) In the search box, TYPE: character controller
+
+   b) You'll see "Character Controller" appear in the list
+
+   c) CLICK on "Character Controller"
+
+   d) It gets added! You'll see a new section appear called "Character Controller"
+
+8. Configure the Character Controller:
+
+   a) In the Character Controller section, you'll see fields
+
+   b) Find "Center" - it has X, Y, Z values
+      - CLICK on the Y field
+      - DELETE the number
+      - TYPE: 1
+      - Press ENTER
+
+   c) Find "Height"
+      - CLICK on it
+      - DELETE the number
+      - TYPE: 2
+      - Press ENTER
+
+   d) Find "Radius"
+      - CLICK on it
+      - DELETE the number
+      - TYPE: 0.5
+      - Press ENTER
+
+STEP 2E: ADD NETWORK OBJECT COMPONENT
+--------------------------------------
+
+9. Add Network Object:
+
+   a) Click "Add Component" button again (bottom of Inspector)
+
+   b) TYPE: network object
+
+   c) Click "Network Object" when it appears
+
+   d) A new "Network Object" section appears
+
+   e) Don't change any settings - just leave it as is
+
+STEP 2F: ADD NETWORK TRANSFORM COMPONENT
+-----------------------------------------
+
+10. Add Network Transform:
+
+    a) Click "Add Component" button again
+
+    b) TYPE: network transform
+
+    c) Click "Network Transform" when it appears
+
+    d) A new "Network Transform" section appears
+
+    e) Don't change any settings
+
+STEP 2G: ADD FPS CONTROLLER SCRIPT
+-----------------------------------
+
+11. Add FPS Controller:
+
+    a) Click "Add Component" button again
+
+    b) TYPE: fps controller
+
+    c) Click "FPS Controller" when it appears
+
+    d) A new "FPS Controller" section appears
+
+    e) You'll see fields like "Walk Speed", "Sprint Speed", etc.
+
+    f) Don't change anything yet - we'll add the camera first
+
+================================================================================
+PART 3: CREATING THE PLAYER CAMERA
+================================================================================
+
+STEP 3A: CREATE EMPTY OBJECT FOR CAMERA
+----------------------------------------
+
+1. Create a child object under Player:
+
+   a) In Hierarchy (left side), find "Player"
+
+   b) RIGHT-CLICK on "Player"
+
+   c) A menu appears
+
+   d) Hover over "Create Empty"
+
+   e) CLICK it
+
+   f) A new object appears UNDER Player (indented)
+      - It's called "GameObject"
+
+2. Rename it to PlayerCamera:
+
+   a) The new object should already be selected (highlighted)
+
+   b) Press F2
+
+   c) TYPE: PlayerCamera
+
+   d) Press ENTER
+
+STEP 3B: ADD CAMERA COMPONENT
+------------------------------
+
+3. Add Camera component:
+
+   a) With PlayerCamera selected in Hierarchy
+
+   b) Look at Inspector (right side)
+
+   c) Click "Add Component"
+
+   d) TYPE: camera
+
+   e) Click "Camera" (the one with the camera icon)
+
+   f) A "Camera" section appears
+
+4. Add Audio Listener:
+
+   a) Click "Add Component" again
+
+   b) TYPE: audio listener
+
+   c) Click "Audio Listener"
+
+   d) It gets added
+
+STEP 3C: POSITION THE CAMERA AT EYE HEIGHT
+-------------------------------------------
+
+5. Set camera position:
+
+   a) With PlayerCamera still selected
+
+   b) In Inspector, find "Transform" section (at the top)
+
+   c) Look for "Position" - it has X, Y, Z fields
+
+   d) Set Position Y to 1.6 (eye height):
+      - CLICK on the Y field
+      - DELETE the number
+      - TYPE: 1.6
+      - Press ENTER
+
+   e) Make sure X is 0:
+      - CLICK on the X field
+      - TYPE: 0
+      - Press ENTER
+
+   f) Make sure Z is 0:
+      - CLICK on the Z field
+      - TYPE: 0
+      - Press ENTER
+
+STEP 3D: LINK CAMERA TO FPS CONTROLLER
+---------------------------------------
+
+6. Connect the camera to the FPS Controller script:
+
+   a) In Hierarchy (left), CLICK on "Player" (the parent)
+
+   b) In Inspector (right), scroll down to "FPS Controller" section
+
+   c) Find the field "Camera Transform"
+      - It says "None (Transform)"
+
+   d) We need to drag PlayerCamera into this field:
+
+      - Look at Hierarchy (left side)
+      - Find "PlayerCamera" (under Player)
+      - LEFT-CLICK and HOLD on "PlayerCamera"
+      - DRAG your mouse to the right side (Inspector)
+      - Hover over the "Camera Transform" field
+      - RELEASE the mouse
+      - It should now say "PlayerCamera" instead of "None"
+
+================================================================================
+PART 4: MAKE IT A PREFAB
+================================================================================
+
+STEP 4A: CREATE THE PREFAB FILE
+--------------------------------
+
+1. Turn Player into a prefab:
+
+   a) Look at Hierarchy (left side)
+
+   b) Find "Player" (the parent object)
+
+   c) LEFT-CLICK and HOLD on "Player"
+
+   d) DRAG down to the Project window (bottom)
+
+   e) Make sure you're in the "Assets" folder (look at the path at top)
+
+   f) RELEASE the mouse in an empty area of the Project window
+
+   g) A blue cube icon appears called "Player"
+      - This is your Player.prefab file!
+
+2. The Player in Hierarchy should now be BLUE:
+   - This means it's connected to the prefab
+
+STEP 4B: DELETE PLAYER FROM SCENE
+----------------------------------
+
+3. Delete Player from the Hierarchy:
+
+   a) In Hierarchy (left), CLICK on "Player"
+
+   b) Press DELETE key (or right-click > Delete)
+
+   c) Player disappears from Hierarchy
+
+   d) This is CORRECT - we'll spawn it via networking instead
+
+4. The Player.prefab still exists:
+
+   - Look in Project window (bottom)
+   - You should see "Player" with a blue cube icon
+   - This is good!
+
+================================================================================
+PART 5: SETUP THE ANIMATOR
+================================================================================
+
+STEP 5A: OPEN THE PLAYER PREFAB
+--------------------------------
+
+1. Open Player prefab for editing:
+
+   a) In Project window (bottom)
+
+   b) Find "Player" (blue cube icon)
+
+   c) DOUBLE-CLICK on "Player"
+
+   d) The Hierarchy changes - it now shows the prefab contents
+
+   e) You should see "Player" at the top
+      - Click the arrow next to it to expand
+
+2. Find the object with Animator:
+
+   a) Under Player, you'll see child objects
+
+   b) Look for one that has many children (bones)
+      - Often called "SM_Chr_Soldier_Male_01" or similar
+
+   c) CLICK on it
+
+   d) In Inspector (right), look for "Animator" component
+
+   e) If you see "Animator", you found it!
+
+STEP 5B: ASSIGN ANIMATOR CONTROLLER
+------------------------------------
+
+3. Find the Animator Controller file:
+
+   a) In Project window (bottom), navigate to:
+      - Assets > Synty > AnimationBaseLocomotion
+
+   b) You might see an "Animator" or "Controllers" folder
+      - Click through folders until you find:
+      - "AC_Polygon_Masculine" or similar name
+      - It has a controller icon (looks like a flowchart)
+
+4. Assign it to the Animator:
+
+   a) The animator object should still be selected in Hierarchy
+
+   b) In Inspector (right), find "Animator" component
+
+   c) Find "Controller" field
+      - It might say "None (Runtime Animator Controller)"
+
+   d) LEFT-CLICK and HOLD on "AC_Polygon_Masculine" in Project window
+
+   e) DRAG it up to the Inspector
+
+   f) DROP it on the "Controller" field
+
+   g) It should now show "AC_Polygon_Masculine"
+
+5. Exit prefab editing mode:
+
+   a) Look at the top of the Hierarchy window
+
+   b) You'll see a back arrow "<"
+
+   c) CLICK the back arrow
+
+   d) You return to the main scene view
+
+================================================================================
+PART 6: ADD NETWORK MANAGER TO SCENE
+================================================================================
+
+STEP 6A: CREATE NETWORK MANAGER OBJECT
+---------------------------------------
+
+1. Create empty GameObject:
+
+   a) In Hierarchy (left), RIGHT-CLICK in empty space
+
+   b) A menu appears
+
+   c) Select "Create Empty"
+
+   d) A new "GameObject" appears
+
+2. Rename it:
+
+   a) With GameObject selected
+
+   b) Press F2
+
+   c) TYPE: NetworkManager
+
+   d) Press ENTER
+
+STEP 6B: ADD NETWORK MANAGER COMPONENT
+---------------------------------------
+
+3. Add the NetworkManager component:
+
+   a) With NetworkManager selected in Hierarchy
+
+   b) In Inspector (right), click "Add Component"
+
+   c) TYPE: network manager
+
+   d) You should see "Network Manager" (with Unity icon)
+
+   e) CLICK it
+
+   f) A big "Network Manager" section appears with LOTS of settings
+
+STEP 6C: ADD PLAYER PREFAB TO NETWORK PREFABS LIST
+---------------------------------------------------
+
+4. Add Player to NetworkPrefabs:
+
+   a) In the Network Manager component (Inspector)
+
+   b) Scroll down until you see "NetworkPrefabs"
+
+   c) You'll see "List is Empty" or a size number
+
+   d) Look for a small "+" button at the bottom-right of that section
+
+   e) CLICK the "+" button
+
+   f) A new slot appears: "Element 0"
+
+   g) It says "None (Network Object)"
+
+5. Drag Player.prefab into the slot:
+
+   a) In Project window (bottom), find "Player" (blue cube)
+
+   b) LEFT-CLICK and HOLD on "Player"
+
+   c) DRAG up to Inspector
+
+   d) DROP it on the "Element 0" field
+
+   e) It should now show "Player" instead of "None"
+
+STEP 6D: SET PLAYER PREFAB
+---------------------------
+
+6. Set the Player Prefab field:
+
+   a) Still in Network Manager component
+
+   b) Scroll up a bit
+
+   c) Find "Player Prefab" field
+      - It says "None (Network Object)"
+
+   d) DRAG Player from Project window again
+
+   e) DROP it on "Player Prefab" field
+
+   f) It should now show "Player"
+
+STEP 6E: ADD SIMPLE NETWORK MENU
+---------------------------------
+
+7. Add the menu UI script:
+
+   a) NetworkManager should still be selected in Hierarchy
+
+   b) In Inspector, click "Add Component"
+
+   c) TYPE: simple network menu
+
+   d) Click "Simple Network Menu"
+
+   e) A "Simple Network Menu" section appears
+
+   f) No settings needed!
+
+================================================================================
+PART 7: DELETE THE OLD MAIN CAMERA
+================================================================================
+
+STEP 7A: FIND AND DELETE MAIN CAMERA
+-------------------------------------
+
+1. Find Main Camera in scene:
+
+   a) Look at Hierarchy (left side)
+
+   b) Scroll through the list
+
+   c) Find "Main Camera"
+
+2. Delete it:
+
+   a) CLICK on "Main Camera"
+
+   b) Press DELETE key
+
+   c) It disappears
+
+WHY? Because each player spawns with their own camera.
+The old Main Camera would conflict with player cameras.
+
+================================================================================
+PART 8: SAVE EVERYTHING
+================================================================================
+
+1. Save the scene:
+
+   a) Top menu bar: File > Save
+
+   b) Or press: Ctrl+S
+
+2. Save the project:
+
+   a) Top menu bar: File > Save Project
+
+   b) Or press: Ctrl+Shift+S
+
+================================================================================
+PART 9: TEST IT!
+================================================================================
+
+STEP 9A: FIRST TEST - HOST GAME
+--------------------------------
+
+1. Press the Play button:
+
+   a) Look at the TOP CENTER of Unity
+
+   b) Find the PLAY button (triangle icon)
+
+   c) CLICK it
+
+   d) The game starts!
+
+2. You should see buttons:
+
+   a) Top-left corner of the Game view
+
+   b) "HOST GAME" button
+
+   c) "JOIN GAME" button
+
+3. Click HOST GAME:
+
+   a) Move your mouse over "HOST GAME"
+
+   b) CLICK it
+
+   c) You should spawn into the military base!
+
+4. Test the controls:
+
+   a) Press W key - you move forward
+   b) Press S key - you move backward
+   c) Press A key - you strafe left
+   d) Press D key - you strafe right
+   e) Move MOUSE - you look around
+   f) Press SPACE - you jump
+   g) Hold LEFT SHIFT + W - you sprint (faster)
+
+5. Stop the game:
+
+   a) Press ESCAPE key - cursor unlocks
+
+   b) Click DISCONNECT button
+
+   c) Or click the PLAY button again to stop
+
+STEP 9B: CHECK FOR ERRORS
+--------------------------
+
+6. If something doesn't work:
+
+   a) Look at the Console window (bottom)
+
+   b) Click the "Console" tab (next to Project)
+
+   c) Any errors will be RED
+
+   d) Tell me what the error says and I'll help fix it
+
+================================================================================
+PART 10: TEST MULTIPLAYER (TWO PLAYERS)
+================================================================================
+
+STEP 10A: BUILD THE GAME
+-------------------------
+
+1. Open Build Settings:
+
+   a) Top menu: File > Build Settings
+
+   b) A "Build Settings" window opens
+
+2. Add the scene to build:
+
+   a) Look for "Scenes In Build" section
+
+   b) If "Demo" is NOT listed:
+      - Click "Add Open Scenes" button
+      - Demo should appear with a checkmark
+
+   c) If Demo IS listed, you're good!
+
+3. Build the executable:
+
+   a) Click "Build" button (bottom right)
+
+   b) A file browser opens
+
+   c) Navigate to your Desktop (or wherever you want)
+
+   d) Create a folder called "KlyraFPS_Build"
+
+   e) Open that folder
+
+   f) In the "File name" field at bottom, type: KlyraFPS
+
+   g) Click "Save"
+
+   h) Unity builds the game (takes 1-2 minutes)
+
+   i) A folder opens when done
+
+STEP 10B: RUN TWO INSTANCES
+----------------------------
+
+4. Start the built game as HOST:
+
+   a) In the build folder, find "KlyraFPS.exe"
+
+   b) DOUBLE-CLICK it
+
+   c) Game window opens
+
+   d) Click "HOST GAME"
+
+   e) You spawn in!
+
+5. Start Unity as CLIENT:
+
+   a) Go back to Unity Editor
+
+   b) Click the PLAY button
+
+   c) Click "JOIN GAME"
+
+   d) You spawn in!
+
+6. YOU NOW HAVE TWO PLAYERS:
+
+   a) In the EXE window, move around
+
+   b) In the Unity window, you should SEE that player moving!
+
+   c) Move in Unity window
+
+   d) In EXE window, you should see THAT player!
+
+SUCCESS! You have multiplayer working!
+
+================================================================================
+WHAT IF IT DOESN'T WORK?
+================================================================================
+
+Common Issues:
+
+1. "I don't see HOST GAME button"
+   - Make sure NetworkManager exists in Hierarchy
+   - Make sure SimpleNetworkMenu component is on NetworkManager
+   - Check Console for errors (red text)
+
+2. "I see button but nothing happens when I click"
+   - Check Console for errors
+   - Make sure Player prefab is in NetworkManager's Player Prefab field
+   - Make sure Player prefab is in NetworkPrefabs list
+
+3. "I spawn but can't move"
+   - Make sure CharacterController is on Player prefab
+   - Make sure FPSController script is on Player prefab
+
+4. "I spawn but fall through the floor"
+   - Make sure you're using Demo scene
+   - The scene should have ground with colliders
+
+5. "Character is stuck in falling animation"
+   - This means animator isn't set up
+   - Go back to PART 5 and assign the animator controller
+
+6. "I can't see anything when I spawn"
+   - Make sure PlayerCamera exists under Player prefab
+   - Make sure Camera Transform is linked in FPSController
+   - Make sure you deleted the old Main Camera
+
+7. "Second player doesn't spawn"
+   - Make sure Player prefab is in NetworkPrefabs list
+   - Check both Console windows for errors
+   - Make sure both are on same network (same computer works)
+
+================================================================================
+
+TELL ME WHICH STEP YOU'RE ON AND IF YOU GET STUCK!
+
+I can help troubleshoot any part of this.
+
