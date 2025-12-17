@@ -264,15 +264,12 @@ public class FPSController : NetworkBehaviour
         if (!isLocalPlayer)
         {
             // Disable CharacterController for remote players - NetworkTransformReliable handles position
+            // Keep reference (don't null it) to avoid GetComponent every frame
             if (controller == null) controller = GetComponent<CharacterController>();
             if (controller != null && controller.enabled)
             {
                 controller.enabled = false;
             }
-
-            // CRITICAL: Clear controller reference so disabled CharacterController state
-            // doesn't interfere with NetworkTransformReliable position updates
-            controller = null;
 
             // Log remote player position occasionally for debugging
             if (Time.frameCount % 300 == 0)
@@ -370,7 +367,8 @@ public class FPSController : NetworkBehaviour
         var keyboard = Keyboard.current;
         var mouse = Mouse.current;
 
-        if (keyboard == null) return;
+        // Both keyboard and mouse required - prevents WebGL crashes on some browsers
+        if (keyboard == null || mouse == null) return;
 
         float moveX = 0f;
         float moveZ = 0f;
@@ -545,17 +543,24 @@ public class FPSController : NetworkBehaviour
         }
 
         Vector3 startPoint = muzzlePoint != null ? muzzlePoint.position : cameraTransform.position;
+
+        // Show effects locally immediately (for responsiveness)
+        SpawnTracer(startPoint, endPoint);
+        StartCoroutine(MuzzleFlashCoroutine());
+
+        // Tell server to show effects to other players
         CmdShootEffects(startPoint, endPoint);
     }
 
     [Command]
     void CmdShootEffects(Vector3 start, Vector3 end)
     {
-        RpcShootEffects(start, end);
+        // Send to all clients except the shooter (they already see effects locally)
+        RpcShootEffectsToOthers(start, end);
     }
 
-    [ClientRpc]
-    void RpcShootEffects(Vector3 start, Vector3 end)
+    [ClientRpc(includeOwner = false)]
+    void RpcShootEffectsToOthers(Vector3 start, Vector3 end)
     {
         SpawnTracer(start, end);
         StartCoroutine(MuzzleFlashCoroutine());
@@ -600,6 +605,28 @@ public class FPSController : NetworkBehaviour
             muzzleFlash.enabled = true;
             yield return new WaitForSeconds(0.05f);
             muzzleFlash.enabled = false;
+        }
+    }
+
+    void OnDestroy()
+    {
+        // Reset static camera flag when local player is destroyed
+        if (isLocalPlayer)
+        {
+            sceneMainCameraClaimed = false;
+            Debug.Log($"Player {netId} destroyed, resetting sceneMainCameraClaimed flag");
+
+            // Cleanup camera if we created one
+            if (cameraTransform != null)
+            {
+                Destroy(cameraTransform.gameObject);
+            }
+        }
+
+        // Cleanup muzzle flash light (prevents memory leak)
+        if (muzzleFlash != null)
+        {
+            Destroy(muzzleFlash.gameObject);
         }
     }
 }

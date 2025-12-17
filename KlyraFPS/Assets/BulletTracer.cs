@@ -6,6 +6,9 @@ public class BulletTracer : MonoBehaviour
     private float fadeSpeed = 10f;
     private float currentAlpha = 1f;
 
+    // Static shared material to prevent memory leak (one material for all tracers)
+    private static Material sharedTracerMaterial;
+
     void Awake()
     {
         lineRenderer = GetComponent<LineRenderer>();
@@ -19,8 +22,12 @@ public class BulletTracer : MonoBehaviour
         lineRenderer.endWidth = 0.01f;
         lineRenderer.positionCount = 2;
 
-        // Create simple material
-        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        // Use shared material to prevent memory leak
+        if (sharedTracerMaterial == null)
+        {
+            sharedTracerMaterial = new Material(Shader.Find("Sprites/Default"));
+        }
+        lineRenderer.material = sharedTracerMaterial;
         lineRenderer.startColor = new Color(1f, 0.8f, 0.2f, 1f); // Yellow/orange
         lineRenderer.endColor = new Color(1f, 0.5f, 0.1f, 0.5f);
     }
