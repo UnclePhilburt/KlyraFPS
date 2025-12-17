@@ -422,21 +422,22 @@ public class FPSController : NetworkBehaviour
 
     void HandleADS()
     {
+        if (playerCamera == null) return;  // Safety guard
+
         var mouse = Mouse.current;
         if (mouse != null)
         {
             isAiming = mouse.rightButton.isPressed;
         }
 
-        if (playerCamera != null)
-        {
-            float targetFOV = isAiming ? aimFOV : normalFOV;
-            playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, targetFOV, Time.deltaTime * aimSpeed);
-        }
+        float targetFOV = isAiming ? aimFOV : normalFOV;
+        playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, targetFOV, Time.deltaTime * aimSpeed);
     }
 
     void Shoot()
     {
+        if (cameraTransform == null) return;  // Safety guard
+
         Ray ray = new Ray(cameraTransform.position, cameraTransform.forward);
         RaycastHit hit;
 
