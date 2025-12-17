@@ -21,17 +21,26 @@ public class SimpleNetworkMenu : MonoBehaviour
 
     void Start()
     {
+        Debug.Log($"SimpleNetworkMenu Start() - BatchMode: {Application.isBatchMode}");
+
         // Auto-start server if running as headless/batch mode
         if (Application.isBatchMode)
         {
+            Debug.Log("Running in batch mode - starting dedicated server...");
+
             string portEnv = System.Environment.GetEnvironmentVariable("PORT");
             if (!string.IsNullOrEmpty(portEnv) && ushort.TryParse(portEnv, out ushort port))
             {
                 serverPort = port;
                 Debug.Log($"Using PORT from environment: {serverPort}");
             }
+            else
+            {
+                Debug.Log($"No PORT env var, using default: {serverPort}");
+            }
 
-            StartServer();
+            // Small delay to ensure everything is initialized
+            Invoke(nameof(StartServer), 0.5f);
         }
     }
 
@@ -192,8 +201,29 @@ public class SimpleNetworkMenu : MonoBehaviour
 
     void StartServer()
     {
+        Debug.Log("StartServer() called");
+
+        if (NetworkManager.singleton == null)
+        {
+            Debug.LogError("NetworkManager.singleton is null!");
+            return;
+        }
+
+        // Configure transport to listen on all interfaces (required for containers/Fly.io)
+        var transport = NetworkManager.singleton.GetComponent<SimpleWebTransport>();
+        if (transport != null)
+        {
+            transport.port = serverPort;
+            Debug.Log($"SimpleWebTransport configured - Port: {transport.port}");
+        }
+        else
+        {
+            Debug.LogError("SimpleWebTransport not found on NetworkManager!");
+        }
+
+        Debug.Log($"Starting server on port {serverPort}...");
         NetworkManager.singleton.StartServer();
-        Debug.Log($"Server started");
+        Debug.Log($"NetworkManager.StartServer() called - Active: {NetworkServer.active}");
     }
 
     void Update()
