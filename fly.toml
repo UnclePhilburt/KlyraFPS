@@ -15,7 +15,10 @@ primary_region = "ord"
 
   [[services.ports]]
     port = 443
-    handlers = ["tls"]
+    handlers = ["tls", "http"]
+
+  [services.http_options]
+    h2_backend = false
 
   [services.concurrency]
     type = "connections"
