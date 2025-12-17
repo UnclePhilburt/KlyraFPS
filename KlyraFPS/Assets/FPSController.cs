@@ -131,6 +131,16 @@ public class FPSController : NetworkBehaviour
 
         Debug.Log($"OnStartClient - isOwned: {isOwned}, isServer: {isServer}, netId: {netId}, pos: {transform.position}");
 
+        // CRITICAL: Remote players must NOT have camera references
+        if (!isOwned)
+        {
+            cameraTransform = null;
+            playerCamera = null;
+            weaponTransform = null;  // Remote players don't need first-person weapon
+            isInitialized = true;
+            Debug.Log($"Remote player {netId} spawned - camera cleared");
+        }
+
         StartCoroutine(InitializePlayerModel());
 
         // Initialize syncedPosition to current spawn position to prevent teleporting
@@ -138,13 +148,6 @@ public class FPSController : NetworkBehaviour
         {
             syncedPosition = transform.position;
             syncedRotationY = transform.eulerAngles.y;
-        }
-
-        // Mark as initialized for remote players too
-        if (!isOwned)
-        {
-            isInitialized = true;
-            Debug.Log($"Remote player spawned at {transform.position}");
         }
     }
 
