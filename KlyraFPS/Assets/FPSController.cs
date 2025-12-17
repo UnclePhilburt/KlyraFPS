@@ -2,6 +2,9 @@ using UnityEngine;
 using Mirror;
 using UnityEngine.InputSystem;
 
+// NOTE: Add NetworkTransform component to Player prefab in Unity Inspector
+// This handles position/rotation sync automatically
+
 public class FPSController : NetworkBehaviour
 {
     [Header("Movement Settings")]
@@ -178,12 +181,11 @@ public class FPSController : NetworkBehaviour
 
         if (!isOwned)
         {
-            // Disable controller for remote players
+            // Disable controller for remote players - NetworkTransform handles position sync
             if (controller == null) controller = GetComponent<CharacterController>();
             if (controller != null && controller.enabled) controller.enabled = false;
 
-            transform.position = syncedPosition;
-            transform.rotation = Quaternion.Euler(0, syncedRotationY, 0);
+            // NetworkTransform handles position/rotation sync automatically
             UpdateRemoteAnimator();
             return;
         }
@@ -209,15 +211,7 @@ public class FPSController : NetworkBehaviour
         HandleADS();
         PositionWeapon();
 
-        if (isServer)
-        {
-            syncedPosition = transform.position;
-            syncedRotationY = rotationY;
-        }
-        else
-        {
-            CmdUpdatePosition(transform.position, rotationY);
-        }
+        // NetworkTransform component handles position/rotation sync automatically
     }
 
     void PositionWeapon()
