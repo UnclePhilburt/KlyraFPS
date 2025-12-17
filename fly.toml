@@ -1,0 +1,21 @@
+app = "klyrafps"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "7777"
+
+[[services]]
+  internal_port = 7777
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+
+  [[services.ports]]
+    port = 7777
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
