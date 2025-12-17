@@ -122,6 +122,19 @@ public class FPSController : NetworkBehaviour
     {
         base.OnStartClient();
         StartCoroutine(InitializePlayerModel());
+
+        // Initialize syncedPosition to current spawn position to prevent teleporting
+        if (isServer)
+        {
+            syncedPosition = transform.position;
+            syncedRotationY = transform.eulerAngles.y;
+        }
+
+        // Mark as initialized for remote players too
+        if (!isOwned)
+        {
+            isInitialized = true;
+        }
     }
 
     System.Collections.IEnumerator InitializePlayerModel()
