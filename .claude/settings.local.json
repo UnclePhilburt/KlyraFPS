@@ -30,7 +30,10 @@
       "Bash(git pull:*)",
       "Bash(chmod:*)",
       "Bash(git check-ignore:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(curl:*)",
+      "Bash(dig:*)",
+      "Bash(fly status:*)"
     ],
     "deny": [],
     "ask": []
