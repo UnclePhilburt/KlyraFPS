@@ -1,5 +1,6 @@
 using UnityEngine;
 using Mirror;
+using Mirror.SimpleWeb;
 
 public class SimpleNetworkMenu : MonoBehaviour
 {
@@ -162,6 +163,21 @@ public class SimpleNetworkMenu : MonoBehaviour
         isConnecting = true;
         statusMessage = "Connecting...";
 
+        // Configure SimpleWebTransport for WebGL
+        var transport = NetworkManager.singleton.GetComponent<SimpleWebTransport>();
+        if (transport != null)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // WebGL must use WSS when page is served over HTTPS
+            transport.clientUseWss = true;
+            transport.port = 443;
+            Debug.Log("WebGL: Using WSS on port 443");
+#else
+            transport.clientUseWss = false;
+            transport.port = serverPort;
+#endif
+        }
+
         NetworkManager.singleton.networkAddress = serverAddress;
         NetworkManager.singleton.StartClient();
 
@@ -182,14 +198,17 @@ public class SimpleNetworkMenu : MonoBehaviour
 
     void Update()
     {
+        if (!isConnecting) return;
+        if (NetworkManager.singleton == null) return;
+
         // Update connection status
-        if (isConnecting && NetworkClient.isConnected)
+        if (NetworkClient.isConnected)
         {
             statusMessage = "";
             isConnecting = false;
             Debug.Log("Connected to server!");
         }
-        else if (isConnecting && !NetworkClient.active)
+        else if (!NetworkClient.active)
         {
             statusMessage = "Connection failed";
             isConnecting = false;
