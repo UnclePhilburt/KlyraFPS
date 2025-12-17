@@ -124,6 +124,9 @@ public class FPSController : NetworkBehaviour
     public override void OnStartClient()
     {
         base.OnStartClient();
+
+        Debug.Log($"OnStartClient - isOwned: {isOwned}, isServer: {isServer}, netId: {netId}, pos: {transform.position}");
+
         StartCoroutine(InitializePlayerModel());
 
         // Initialize syncedPosition to current spawn position to prevent teleporting
@@ -137,6 +140,7 @@ public class FPSController : NetworkBehaviour
         if (!isOwned)
         {
             isInitialized = true;
+            Debug.Log($"Remote player spawned at {transform.position}");
         }
     }
 
@@ -184,6 +188,12 @@ public class FPSController : NetworkBehaviour
             // Disable controller for remote players - NetworkTransform handles position sync
             if (controller == null) controller = GetComponent<CharacterController>();
             if (controller != null && controller.enabled) controller.enabled = false;
+
+            // Log remote player position occasionally for debugging
+            if (Time.frameCount % 300 == 0)
+            {
+                Debug.Log($"Remote player {netId} at {transform.position}");
+            }
 
             // NetworkTransform handles position/rotation sync automatically
             UpdateRemoteAnimator();
