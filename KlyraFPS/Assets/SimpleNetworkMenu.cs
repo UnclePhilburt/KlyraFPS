@@ -209,12 +209,13 @@ public class SimpleNetworkMenu : MonoBehaviour
             return;
         }
 
-        // Configure transport to listen on all interfaces (required for containers/Fly.io)
+        // Configure transport for Fly.io (TLS terminated at edge, plain WS internally)
         var transport = NetworkManager.singleton.GetComponent<SimpleWebTransport>();
         if (transport != null)
         {
             transport.port = serverPort;
-            Debug.Log($"SimpleWebTransport configured - Port: {transport.port}");
+            transport.sslEnabled = false;  // Fly.io handles TLS termination
+            Debug.Log($"SimpleWebTransport configured - Port: {transport.port}, SSL: {transport.sslEnabled}");
         }
         else
         {
