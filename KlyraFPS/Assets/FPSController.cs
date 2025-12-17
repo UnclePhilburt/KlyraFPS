@@ -203,19 +203,20 @@ public class FPSController : NetworkBehaviour
 
         if (!isOwned)
         {
-            // Disable controller for remote players - NetworkTransform handles position sync
+            // Disable controller for remote players
             if (controller == null) controller = GetComponent<CharacterController>();
             if (controller != null && controller.enabled) controller.enabled = false;
 
-            // Log remote player position and NetworkTransform state occasionally for debugging
+            // Apply synced position/rotation from owner (manual sync workaround)
+            transform.position = Vector3.Lerp(transform.position, syncedPosition, Time.deltaTime * 15f);
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, syncedRotationY, 0f), Time.deltaTime * 15f);
+
+            // Log remote player position occasionally for debugging
             if (Time.frameCount % 300 == 0)
             {
-                var netTransform = GetComponent<NetworkTransformReliable>();
-                int snapshotCount = netTransform != null ? netTransform.clientSnapshots.Count : -1;
-                Debug.Log($"Remote player {netId} at {transform.position}, snapshots: {snapshotCount}");
+                Debug.Log($"Remote player {netId} at {transform.position}, synced: {syncedPosition}");
             }
 
-            // NetworkTransform handles position/rotation sync automatically
             UpdateRemoteAnimator();
             return;
         }
@@ -378,6 +379,9 @@ public class FPSController : NetworkBehaviour
         syncedMovementInputHeld = isMoving;
         syncedStrafeX = moveX;
         syncedStrafeZ = moveZ;
+
+        // Manual position sync via Command (NetworkTransform authority issue workaround)
+        CmdUpdatePosition(transform.position, rotationY);
 
         if (!isMoving)
             syncedCurrentGait = 0;
