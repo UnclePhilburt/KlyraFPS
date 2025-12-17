@@ -2,8 +2,8 @@ using UnityEngine;
 using Mirror;
 using UnityEngine.InputSystem;
 
-// NOTE: Add NetworkTransform component to Player prefab in Unity Inspector
-// This handles position/rotation sync automatically
+// NOTE: NetworkTransformReliable component handles position/rotation sync
+// Ensure syncDirection is ClientToServer, coordinateSpace is World
 
 public class FPSController : NetworkBehaviour
 {
@@ -131,6 +131,17 @@ public class FPSController : NetworkBehaviour
 
         Debug.Log($"OnStartClient - isOwned: {isOwned}, isServer: {isServer}, netId: {netId}, pos: {transform.position}");
 
+        // Check NetworkTransform configuration
+        var netTransform = GetComponent<NetworkTransformReliable>();
+        if (netTransform != null)
+        {
+            Debug.Log($"[Player {netId}] NetworkTransform - enabled: {netTransform.enabled}, syncDirection: {netTransform.syncDirection}, coordinateSpace: {netTransform.coordinateSpace}, isOwned: {isOwned}");
+        }
+        else
+        {
+            Debug.LogError($"[Player {netId}] NetworkTransformReliable NOT found!");
+        }
+
         // CRITICAL: Remote players must NOT have camera references
         if (!isOwned)
         {
@@ -138,7 +149,7 @@ public class FPSController : NetworkBehaviour
             playerCamera = null;
             weaponTransform = null;  // Remote players don't need first-person weapon
             isInitialized = true;
-            Debug.Log($"Remote player {netId} spawned - camera cleared");
+            Debug.Log($"Remote player {netId} spawned at {transform.position} - camera cleared");
         }
 
         StartCoroutine(InitializePlayerModel());
@@ -196,10 +207,12 @@ public class FPSController : NetworkBehaviour
             if (controller == null) controller = GetComponent<CharacterController>();
             if (controller != null && controller.enabled) controller.enabled = false;
 
-            // Log remote player position occasionally for debugging
+            // Log remote player position and NetworkTransform state occasionally for debugging
             if (Time.frameCount % 300 == 0)
             {
-                Debug.Log($"Remote player {netId} at {transform.position}");
+                var netTransform = GetComponent<NetworkTransformReliable>();
+                int snapshotCount = netTransform != null ? netTransform.clientSnapshots.Count : -1;
+                Debug.Log($"Remote player {netId} at {transform.position}, snapshots: {snapshotCount}");
             }
 
             // NetworkTransform handles position/rotation sync automatically
@@ -272,10 +285,11 @@ public class FPSController : NetworkBehaviour
                 cameraTransform.rotation = Quaternion.Euler(rotationX, rotationY, 0f);
             }
 
-            // Debug log every 5 seconds
+            // Debug log every 5 seconds - include authority status for NetworkTransform debugging
             if (Time.frameCount % 300 == 0)
             {
-                Debug.Log($"LOCAL player {netId} - pos: {transform.position}, rotY: {rotationY}, isOwned: {isOwned}");
+                var nt = GetComponent<NetworkTransformReliable>();
+                Debug.Log($"LOCAL player {netId} - pos: {transform.position}, rotY: {rotationY}, authority: {authority}");
             }
         }
     }
