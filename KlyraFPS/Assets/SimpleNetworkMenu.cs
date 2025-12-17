@@ -1,84 +1,58 @@
 using UnityEngine;
 using Unity.Netcode;
-using System;
-using System.Threading.Tasks;
-using Unity.Services.Core;
-using Unity.Services.Authentication;
-using Unity.Services.Relay;
-using Unity.Services.Relay.Models;
 using Unity.Netcode.Transports.UTP;
 
 public class SimpleNetworkMenu : MonoBehaviour
 {
-    private int playerCount = 0;
     private GUIStyle buttonStyle;
     private GUIStyle labelStyle;
     private GUIStyle textFieldStyle;
-    private GUIStyle codeDisplayStyle;
     private bool stylesInitialized = false;
 
-    // Relay
-    private string joinCode = "";
-    private string currentHostCode = "";
+    [Header("Server Settings")]
+    [Tooltip("Address of your Render server (e.g., your-app.onrender.com)")]
+    public string serverAddress = "localhost";
+
+    [Tooltip("Port for the game server")]
+    public ushort serverPort = 7777;
+
+    [Tooltip("Enable for WebGL builds - uses WebSockets")]
+    public bool useWebSockets = true;
+
     private string statusMessage = "";
     private bool isConnecting = false;
-    private bool servicesReady = false;
 
-    [Header("Settings")]
-    public int maxConnections = 16;
-
-    [Tooltip("Enable if browser players will join. Host will use WebSockets for compatibility.")]
-    public bool supportWebGLClients = true;
-
-    // Check if we need WebSocket mode (WebGL or hosting for WebGL clients)
-    private bool UseWebSockets
+    void Start()
     {
-        get
+        // Auto-start server if running as headless/batch mode (on Render)
+        if (Application.isBatchMode)
         {
-#if UNITY_WEBGL && !UNITY_EDITOR
-            return true;
-#else
-            return supportWebGLClients;
-#endif
+            // Check for PORT environment variable (Render sets this)
+            string portEnv = System.Environment.GetEnvironmentVariable("PORT");
+            if (!string.IsNullOrEmpty(portEnv) && ushort.TryParse(portEnv, out ushort port))
+            {
+                serverPort = port;
+                Debug.Log($"Using PORT from environment: {serverPort}");
+            }
+
+            StartServer();
         }
+
+        // Configure transport
+        ConfigureTransport();
     }
 
-    async void Start()
+    void ConfigureTransport()
     {
-        // Enable WebSockets on transport if needed
         var transport = NetworkManager.Singleton?.GetComponent<UnityTransport>();
-        if (transport != null && UseWebSockets)
+        if (transport != null)
         {
+            // Always use WebSockets for browser compatibility
+#if UNITY_WEBGL && !UNITY_EDITOR
             transport.UseWebSockets = true;
-        }
-
-        await InitializeServices();
-    }
-
-    async Task InitializeServices()
-    {
-        try
-        {
-            statusMessage = "Initializing...";
-
-            if (UnityServices.State != ServicesInitializationState.Initialized)
-            {
-                await UnityServices.InitializeAsync();
-            }
-
-            if (!AuthenticationService.Instance.IsSignedIn)
-            {
-                await AuthenticationService.Instance.SignInAnonymouslyAsync();
-            }
-
-            servicesReady = true;
-            statusMessage = "";
-            Debug.Log($"Services ready. Player ID: {AuthenticationService.Instance.PlayerId}");
-        }
-        catch (Exception e)
-        {
-            statusMessage = $"Error: {e.Message}";
-            Debug.LogError($"Failed to initialize services: {e.Message}");
+#else
+            transport.UseWebSockets = useWebSockets;
+#endif
         }
     }
 
@@ -96,289 +70,191 @@ public class SimpleNetworkMenu : MonoBehaviour
         labelStyle.normal.textColor = Color.white;
 
         textFieldStyle = new GUIStyle(GUI.skin.textField);
-        textFieldStyle.fontSize = 28;
+        textFieldStyle.fontSize = 18;
         textFieldStyle.alignment = TextAnchor.MiddleCenter;
-        textFieldStyle.fontStyle = FontStyle.Bold;
-
-        codeDisplayStyle = new GUIStyle(GUI.skin.box);
-        codeDisplayStyle.fontSize = 32;
-        codeDisplayStyle.fontStyle = FontStyle.Bold;
-        codeDisplayStyle.alignment = TextAnchor.MiddleCenter;
-        codeDisplayStyle.normal.textColor = Color.yellow;
 
         stylesInitialized = true;
     }
 
     void OnGUI()
     {
+        // Don't show UI in headless mode
+        if (Application.isBatchMode) return;
+
         InitializeStyles();
 
         if (NetworkManager.Singleton == null)
         {
             GUILayout.BeginArea(new Rect(10, 10, 300, 100));
-            GUILayout.Label("NetworkManager not found in scene!", labelStyle);
-            GUILayout.Label("Please add NetworkManager to your scene.", labelStyle);
+            GUILayout.Label("NetworkManager not found!", labelStyle);
             GUILayout.EndArea();
             return;
         }
 
-        GUILayout.BeginArea(new Rect(10, 10, 300, 500));
+        GUILayout.BeginArea(new Rect(10, 10, 350, 400));
 
-        // Show connection buttons if not connected
         if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
         {
-            GUILayout.Label("MULTIPLAYER MENU", labelStyle);
-            GUILayout.Space(10);
-
-            // Show status message if any
-            if (!string.IsNullOrEmpty(statusMessage))
-            {
-                GUILayout.Label(statusMessage, labelStyle);
-                GUILayout.Space(10);
-            }
-
-            // Disable buttons if connecting or services not ready
-            GUI.enabled = servicesReady && !isConnecting;
-
-            if (GUILayout.Button("HOST GAME", buttonStyle, GUILayout.Height(60)))
-            {
-                HostWithRelay();
-            }
-
-            GUILayout.Space(20);
-
-            GUILayout.Label("JOIN WITH CODE:", labelStyle);
-            GUILayout.Space(5);
-
-            joinCode = GUILayout.TextField(joinCode.ToUpper(), 6, textFieldStyle, GUILayout.Height(50));
-
-            GUILayout.Space(10);
-
-            // Only enable join if code is entered
-            GUI.enabled = servicesReady && !isConnecting && joinCode.Length >= 6;
-
-            if (GUILayout.Button("JOIN GAME", buttonStyle, GUILayout.Height(60)))
-            {
-                JoinWithRelay(joinCode);
-            }
-
-            GUI.enabled = true;
+            DrawConnectionMenu();
         }
         else
         {
-            // Show status when connected
-            GUILayout.Label("CONNECTED", labelStyle);
-            GUILayout.Space(10);
-
-            string status = NetworkManager.Singleton.IsHost ? "HOST" :
-                           NetworkManager.Singleton.IsServer ? "SERVER" : "CLIENT";
-            GUILayout.Label($"Status: {status}", labelStyle);
-
-            // Show join code if hosting
-            if (NetworkManager.Singleton.IsHost && !string.IsNullOrEmpty(currentHostCode))
-            {
-                GUILayout.Space(10);
-                GUILayout.Label("JOIN CODE:", labelStyle);
-                GUILayout.Box(currentHostCode, codeDisplayStyle, GUILayout.Height(50));
-
-                if (GUILayout.Button("COPY CODE", buttonStyle, GUILayout.Height(40)))
-                {
-                    GUIUtility.systemCopyBuffer = currentHostCode;
-                    statusMessage = "Copied!";
-                }
-            }
-
-            // Show player count if host/server
-            if (NetworkManager.Singleton.IsServer)
-            {
-                GUILayout.Space(10);
-                int connectedCount = NetworkManager.Singleton.ConnectedClients.Count;
-                GUILayout.Label($"Players: {connectedCount}", labelStyle);
-            }
-
-            GUILayout.Space(20);
-
-            if (GUILayout.Button("DISCONNECT", buttonStyle, GUILayout.Height(60)))
-            {
-                NetworkManager.Singleton.Shutdown();
-                currentHostCode = "";
-                statusMessage = "";
-                Debug.Log("Disconnected");
-            }
+            DrawConnectedStatus();
         }
 
         GUILayout.EndArea();
     }
 
-    // Get the appropriate server endpoint based on platform
-    private RelayServerEndpoint GetServerEndpoint(Allocation allocation)
+    void DrawConnectionMenu()
     {
-        string connectionType = UseWebSockets ? "wss" : "dtls";
+        GUILayout.Label("KLYRA FPS", labelStyle);
+        GUILayout.Space(10);
 
-        foreach (var endpoint in allocation.ServerEndpoints)
+        if (!string.IsNullOrEmpty(statusMessage))
         {
-            if (endpoint.ConnectionType == connectionType)
-            {
-                return endpoint;
-            }
+            GUILayout.Label(statusMessage, labelStyle);
+            GUILayout.Space(10);
         }
 
-        // Fallback to first available
-        Debug.LogWarning($"Could not find {connectionType} endpoint, using first available");
-        return allocation.ServerEndpoints[0];
-    }
+        GUILayout.Label("Server Address:", labelStyle);
+        serverAddress = GUILayout.TextField(serverAddress, textFieldStyle, GUILayout.Height(35));
+        GUILayout.Space(10);
 
-    private RelayServerEndpoint GetServerEndpoint(JoinAllocation allocation)
-    {
-        string connectionType = UseWebSockets ? "wss" : "dtls";
+        GUI.enabled = !isConnecting;
 
-        foreach (var endpoint in allocation.ServerEndpoints)
+        // Join server button (for players)
+        if (GUILayout.Button("JOIN SERVER", buttonStyle, GUILayout.Height(60)))
         {
-            if (endpoint.ConnectionType == connectionType)
-            {
-                return endpoint;
-            }
+            JoinServer();
         }
 
-        // Fallback to first available
-        Debug.LogWarning($"Could not find {connectionType} endpoint, using first available");
-        return allocation.ServerEndpoints[0];
+        GUILayout.Space(20);
+
+        // Local testing options
+        GUILayout.Label("--- Local Testing ---", labelStyle);
+        GUILayout.Space(5);
+
+        if (GUILayout.Button("HOST (Local)", buttonStyle, GUILayout.Height(40)))
+        {
+            StartHost();
+        }
+
+        if (GUILayout.Button("SERVER (Local)", buttonStyle, GUILayout.Height(40)))
+        {
+            StartServer();
+        }
+
+        GUI.enabled = true;
     }
 
-    async void HostWithRelay()
+    void DrawConnectedStatus()
     {
-        try
+        GUILayout.Label("CONNECTED", labelStyle);
+        GUILayout.Space(10);
+
+        string status = NetworkManager.Singleton.IsHost ? "HOST" :
+                       NetworkManager.Singleton.IsServer ? "SERVER" : "CLIENT";
+        GUILayout.Label($"Status: {status}", labelStyle);
+
+        if (NetworkManager.Singleton.IsServer)
         {
-            isConnecting = true;
-            statusMessage = "Creating game...";
+            int playerCount = NetworkManager.Singleton.ConnectedClients.Count;
+            GUILayout.Label($"Players: {playerCount}", labelStyle);
+        }
 
-            // Create relay allocation
-            Allocation allocation = await RelayService.Instance.CreateAllocationAsync(maxConnections);
+        GUILayout.Space(20);
 
-            // Get join code
-            currentHostCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-            Debug.Log($"Join Code: {currentHostCode}");
-
-            // Get appropriate endpoint for platform
-            var endpoint = GetServerEndpoint(allocation);
-            Debug.Log($"Using endpoint: {endpoint.ConnectionType} - {endpoint.Host}:{endpoint.Port}");
-
-            // Configure transport
-            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-
-            // Enable WebSockets if needed
-            if (UseWebSockets)
-            {
-                transport.UseWebSockets = true;
-            }
-
-            transport.SetRelayServerData(
-                endpoint.Host,
-                (ushort)endpoint.Port,
-                allocation.AllocationIdBytes,
-                allocation.Key,
-                allocation.ConnectionData,
-                null,
-                UseWebSockets // isSecure - true for wss
-            );
-
-            // Start host
-            NetworkManager.Singleton.StartHost();
-
+        if (GUILayout.Button("DISCONNECT", buttonStyle, GUILayout.Height(60)))
+        {
+            NetworkManager.Singleton.Shutdown();
             statusMessage = "";
-            Debug.Log("Host started with Relay");
         }
-        catch (Exception e)
+    }
+
+    void JoinServer()
+    {
+        isConnecting = true;
+        statusMessage = "Connecting...";
+
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+
+        // Configure connection
+#if UNITY_WEBGL && !UNITY_EDITOR
+        transport.UseWebSockets = true;
+#else
+        transport.UseWebSockets = useWebSockets;
+#endif
+
+        transport.ConnectionData.Address = serverAddress;
+        transport.ConnectionData.Port = serverPort;
+
+        Debug.Log($"Connecting to {serverAddress}:{serverPort} (WebSockets: {transport.UseWebSockets})");
+
+        NetworkManager.Singleton.OnClientConnectedCallback += OnConnected;
+        NetworkManager.Singleton.OnClientDisconnectCallback += OnDisconnected;
+
+        if (!NetworkManager.Singleton.StartClient())
         {
-            statusMessage = $"Host failed: {e.Message}";
-            Debug.LogError($"Failed to host: {e.Message}");
-        }
-        finally
-        {
+            statusMessage = "Failed to start client";
             isConnecting = false;
         }
     }
 
-    async void JoinWithRelay(string code)
+    void StartHost()
     {
-        try
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        transport.UseWebSockets = useWebSockets;
+        transport.ConnectionData.Address = "0.0.0.0";
+        transport.ConnectionData.Port = serverPort;
+
+        if (NetworkManager.Singleton.StartHost())
         {
-            isConnecting = true;
-            statusMessage = "Joining game...";
+            Debug.Log($"Host started on port {serverPort}");
+        }
+    }
 
-            code = code.Trim().ToUpper();
-            Debug.Log($"Joining with code: {code}");
+    void StartServer()
+    {
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        transport.UseWebSockets = true; // Always WebSockets for browser clients
+        transport.ConnectionData.Address = "0.0.0.0";
+        transport.ConnectionData.Port = serverPort;
 
-            // Join relay allocation
-            JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(code);
+        if (NetworkManager.Singleton.StartServer())
+        {
+            Debug.Log($"Server started on port {serverPort} with WebSockets");
+        }
+        else
+        {
+            Debug.LogError("Failed to start server");
+        }
+    }
 
-            // Get appropriate endpoint for platform
-            var endpoint = GetServerEndpoint(joinAllocation);
-            Debug.Log($"Using endpoint: {endpoint.ConnectionType} - {endpoint.Host}:{endpoint.Port}");
-
-            // Configure transport
-            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-
-            // Enable WebSockets if needed
-            if (UseWebSockets)
-            {
-                transport.UseWebSockets = true;
-            }
-
-            transport.SetRelayServerData(
-                endpoint.Host,
-                (ushort)endpoint.Port,
-                joinAllocation.AllocationIdBytes,
-                joinAllocation.Key,
-                joinAllocation.ConnectionData,
-                joinAllocation.HostConnectionData,
-                UseWebSockets // isSecure - true for wss
-            );
-
-            // Start client
-            NetworkManager.Singleton.StartClient();
-
+    void OnConnected(ulong clientId)
+    {
+        if (clientId == NetworkManager.Singleton.LocalClientId)
+        {
             statusMessage = "";
-            Debug.Log("Client started with Relay");
+            isConnecting = false;
+            Debug.Log("Connected to server!");
         }
-        catch (Exception e)
+    }
+
+    void OnDisconnected(ulong clientId)
+    {
+        if (clientId == NetworkManager.Singleton.LocalClientId)
         {
-            statusMessage = $"Join failed: {e.Message}";
-            Debug.LogError($"Failed to join: {e.Message}");
-        }
-        finally
-        {
+            statusMessage = "Disconnected";
             isConnecting = false;
         }
     }
 
-    void OnEnable()
+    void OnDestroy()
     {
         if (NetworkManager.Singleton != null)
         {
-            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
-            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+            NetworkManager.Singleton.OnClientConnectedCallback -= OnConnected;
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnDisconnected;
         }
-    }
-
-    void OnDisable()
-    {
-        if (NetworkManager.Singleton != null)
-        {
-            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
-            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
-        }
-    }
-
-    void OnClientConnected(ulong clientId)
-    {
-        Debug.Log($"Client {clientId} connected");
-        playerCount++;
-    }
-
-    void OnClientDisconnected(ulong clientId)
-    {
-        Debug.Log($"Client {clientId} disconnected");
-        playerCount--;
     }
 }
