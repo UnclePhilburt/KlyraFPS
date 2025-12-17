@@ -89,6 +89,8 @@ public class FPSController : NetworkBehaviour
     {
         base.OnStartLocalPlayer();
 
+        Debug.Log($">>> OnStartLocalPlayer called for netId: {netId}");
+
         controller = GetComponent<CharacterController>();
 
         rotationY = transform.eulerAngles.y;
@@ -99,6 +101,7 @@ public class FPSController : NetworkBehaviour
         if (cameraTransform == null)
         {
             cameraTransform = Camera.main.transform;
+            Debug.Log($"Grabbed Camera.main for player {netId}");
         }
 
         if (cameraTransform != null)
@@ -119,6 +122,7 @@ public class FPSController : NetworkBehaviour
         Cursor.visible = false;
 
         isInitialized = true;
+        Debug.Log($">>> Local player {netId} fully initialized, cursor locked: {Cursor.lockState}");
     }
 
     public override void OnStartClient()
@@ -263,6 +267,12 @@ public class FPSController : NetworkBehaviour
                 Vector3 targetPosition = transform.position + Vector3.up * cameraHeight;
                 cameraTransform.position = targetPosition;
                 cameraTransform.rotation = Quaternion.Euler(rotationX, rotationY, 0f);
+            }
+
+            // Debug log every 5 seconds
+            if (Time.frameCount % 300 == 0)
+            {
+                Debug.Log($"LOCAL player {netId} - pos: {transform.position}, rotY: {rotationY}, isOwned: {isOwned}");
             }
         }
     }
