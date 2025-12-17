@@ -128,6 +128,8 @@ public class SimpleNetworkMenu : MonoBehaviour
             JoinServer();
         }
 
+        // Only show local testing options in Editor/standalone (not WebGL)
+#if !UNITY_WEBGL || UNITY_EDITOR
         GUILayout.Space(20);
 
         // Local testing options
@@ -143,6 +145,7 @@ public class SimpleNetworkMenu : MonoBehaviour
         {
             StartServer();
         }
+#endif
 
         GUI.enabled = true;
     }
