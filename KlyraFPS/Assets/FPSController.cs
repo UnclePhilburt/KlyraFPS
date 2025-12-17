@@ -66,6 +66,9 @@ public class FPSController : NetworkBehaviour
     private float rotationX = 0f;
     private float rotationY = 0f;
 
+    // Static flag to track scene camera ownership across all player instances
+    private static bool sceneMainCameraClaimed = false;
+
     // Shooting
     private float nextFireTime = 0f;
     private Light muzzleFlash;
@@ -109,31 +112,31 @@ public class FPSController : NetworkBehaviour
 
         StartCoroutine(InitializePlayerModel());
 
-        // CRITICAL FIX: Only grab Camera.main if it hasn't been claimed by another player
-        // Use a tag check to see if the camera has been claimed
+        // CRITICAL FIX: Use static flag to track camera ownership across all player instances
         if (cameraTransform == null)
         {
             Camera mainCam = Camera.main;
 
-            // Check if Camera.main is available and hasn't been claimed (still has MainCamera tag)
-            if (mainCam != null && mainCam.CompareTag("MainCamera"))
+            // Check static flag AND tag to prevent race conditions
+            if (!sceneMainCameraClaimed && mainCam != null && mainCam.CompareTag("MainCamera"))
             {
-                // This is the first player - claim the scene camera
+                // First player claims the scene camera - set flag FIRST to prevent race
+                sceneMainCameraClaimed = true;
+
                 cameraTransform = mainCam.transform;
                 cameraTransform.SetParent(null);
                 DontDestroyOnLoad(cameraTransform.gameObject);
 
-                // Remove MainCamera tag so subsequent players know it's taken
+                // Remove MainCamera tag as backup
                 mainCam.tag = "Untagged";
 
                 playerCamera = mainCam;
-                Debug.Log($"Player {netId} claimed existing scene Camera.main");
+                Debug.Log($"Player {netId} claimed existing scene Camera.main (static flag set)");
             }
             else
             {
-                // Camera.main is either null or already claimed by another player
-                // Create a new camera for this player
-                Debug.Log($"Player {netId}: Creating new camera (Camera.main already claimed or missing)");
+                // Camera already claimed or unavailable - create new camera for this player
+                Debug.Log($"Player {netId}: Creating new camera (sceneMainCameraClaimed={sceneMainCameraClaimed}, Camera.main={(mainCam != null ? "exists" : "null")})");
                 GameObject newCameraObj = new GameObject($"PlayerCamera_{netId}");
                 playerCamera = newCameraObj.AddComponent<Camera>();
                 cameraTransform = newCameraObj.transform;
@@ -158,7 +161,7 @@ public class FPSController : NetworkBehaviour
                     playerCamera.farClipPlane = 1000f;
                 }
 
-                playerCamera.tag = "Untagged"; // Don't tag as MainCamera to avoid conflicts
+                playerCamera.tag = "Untagged";
             }
         }
 
@@ -262,7 +265,14 @@ public class FPSController : NetworkBehaviour
         {
             // Disable CharacterController for remote players - NetworkTransformReliable handles position
             if (controller == null) controller = GetComponent<CharacterController>();
-            if (controller != null && controller.enabled) controller.enabled = false;
+            if (controller != null && controller.enabled)
+            {
+                controller.enabled = false;
+            }
+
+            // CRITICAL: Clear controller reference so disabled CharacterController state
+            // doesn't interfere with NetworkTransformReliable position updates
+            controller = null;
 
             // Log remote player position occasionally for debugging
             if (Time.frameCount % 300 == 0)
@@ -467,7 +477,9 @@ public class FPSController : NetworkBehaviour
         rotationX -= mouseY;
         rotationX = Mathf.Clamp(rotationX, -maxLookAngle, maxLookAngle);
 
-        transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
+        // REMOVED: transform.rotation assignment - now ONLY set in LateUpdate()
+        // This prevents double-assignment that caused rotation desync between
+        // what the local player sees and what NetworkTransform captures
     }
 
     void UpdateRemoteAnimator()
