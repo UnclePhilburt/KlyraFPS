@@ -109,19 +109,64 @@ public class FPSController : NetworkBehaviour
 
         StartCoroutine(InitializePlayerModel());
 
+        // CRITICAL FIX: Only grab Camera.main if it hasn't been claimed by another player
+        // Use a tag check to see if the camera has been claimed
         if (cameraTransform == null)
         {
-            cameraTransform = Camera.main.transform;
-            Debug.Log($"Grabbed Camera.main for player {netId}");
+            Camera mainCam = Camera.main;
+
+            // Check if Camera.main is available and hasn't been claimed (still has MainCamera tag)
+            if (mainCam != null && mainCam.CompareTag("MainCamera"))
+            {
+                // This is the first player - claim the scene camera
+                cameraTransform = mainCam.transform;
+                cameraTransform.SetParent(null);
+                DontDestroyOnLoad(cameraTransform.gameObject);
+
+                // Remove MainCamera tag so subsequent players know it's taken
+                mainCam.tag = "Untagged";
+
+                playerCamera = mainCam;
+                Debug.Log($"Player {netId} claimed existing scene Camera.main");
+            }
+            else
+            {
+                // Camera.main is either null or already claimed by another player
+                // Create a new camera for this player
+                Debug.Log($"Player {netId}: Creating new camera (Camera.main already claimed or missing)");
+                GameObject newCameraObj = new GameObject($"PlayerCamera_{netId}");
+                playerCamera = newCameraObj.AddComponent<Camera>();
+                cameraTransform = newCameraObj.transform;
+                cameraTransform.SetParent(null);
+                DontDestroyOnLoad(newCameraObj);
+
+                // Copy settings from main camera if it exists
+                if (mainCam != null)
+                {
+                    playerCamera.clearFlags = mainCam.clearFlags;
+                    playerCamera.backgroundColor = mainCam.backgroundColor;
+                    playerCamera.cullingMask = mainCam.cullingMask;
+                    playerCamera.orthographic = mainCam.orthographic;
+                    playerCamera.nearClipPlane = mainCam.nearClipPlane;
+                    playerCamera.farClipPlane = mainCam.farClipPlane;
+                }
+                else
+                {
+                    // Set reasonable defaults
+                    playerCamera.clearFlags = CameraClearFlags.Skybox;
+                    playerCamera.nearClipPlane = 0.3f;
+                    playerCamera.farClipPlane = 1000f;
+                }
+
+                playerCamera.tag = "Untagged"; // Don't tag as MainCamera to avoid conflicts
+            }
         }
 
-        if (cameraTransform != null)
+        if (playerCamera == null && cameraTransform != null)
         {
-            cameraTransform.SetParent(null);
-            DontDestroyOnLoad(cameraTransform.gameObject);
+            playerCamera = cameraTransform.GetComponent<Camera>();
         }
 
-        playerCamera = cameraTransform?.GetComponent<Camera>();
         if (playerCamera != null)
         {
             playerCamera.fieldOfView = normalFOV;
@@ -154,13 +199,20 @@ public class FPSController : NetworkBehaviour
         }
 
         // CRITICAL: Remote players must NOT have camera references
+        // Check isLocalPlayer - should be false for remote players, true for local
+        Debug.Log($"[Player {netId}] OnStartClient - isLocalPlayer: {isLocalPlayer}, isOwned: {isOwned}");
+
         if (!isLocalPlayer)
         {
             cameraTransform = null;
             playerCamera = null;
             weaponTransform = null;  // Remote players don't need first-person weapon
             isInitialized = true;
-            Debug.Log($">>> REMOTE PLAYER SPAWNED - netId: {netId}, position: {transform.position}");
+            Debug.Log($">>> REMOTE PLAYER SPAWNED - netId: {netId}, camera cleared");
+        }
+        else
+        {
+            Debug.Log($">>> LOCAL PLAYER in OnStartClient - netId: {netId}, NOT clearing camera");
         }
 
         StartCoroutine(InitializePlayerModel());
@@ -277,6 +329,12 @@ public class FPSController : NetworkBehaviour
 
     void LateUpdate()
     {
+        // Debug: log which players are trying to control camera
+        if (Time.frameCount % 300 == 0)
+        {
+            Debug.Log($"[LateUpdate] Player {netId} - isLocalPlayer: {isLocalPlayer}, cameraTransform: {(cameraTransform != null ? "SET" : "NULL")}");
+        }
+
         // Use isLocalPlayer instead of isOwned to ensure only THIS client's player controls the camera
         if (isLocalPlayer)
         {
@@ -292,7 +350,7 @@ public class FPSController : NetworkBehaviour
             // Debug log every 5 seconds
             if (Time.frameCount % 300 == 0)
             {
-                Debug.Log($"LOCAL player {netId} - pos: {transform.position}, rotY: {rotationY}, isLocalPlayer: {isLocalPlayer}");
+                Debug.Log($"LOCAL player {netId} - pos: {transform.position}, rotY: {rotationY}");
             }
         }
     }
