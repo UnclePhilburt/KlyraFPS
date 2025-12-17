@@ -13,8 +13,8 @@ public class SimpleNetworkMenu : MonoBehaviour
     [Tooltip("Address of your Fly.io server")]
     public string serverAddress = "klyrafps.fly.dev";
 
-    [Tooltip("Port for the game server")]
-    public ushort serverPort = 7777;
+    [Tooltip("Port for the game server (443 for Fly.io WSS, 7777 for local)")]
+    public ushort serverPort = 443;
 
     [Tooltip("Enable for WebGL builds - uses WebSockets")]
     public bool useWebSockets = true;

@@ -7,14 +7,16 @@ primary_region = "ord"
 [env]
   PORT = "7777"
 
-[[services]]
+[http_service]
   internal_port = 7777
-  protocol = "tcp"
+  force_https = false
   auto_stop_machines = false
   auto_start_machines = true
 
-  [[services.ports]]
-    port = 7777
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 100
+    soft_limit = 50
 
 [[vm]]
   memory = "1gb"
