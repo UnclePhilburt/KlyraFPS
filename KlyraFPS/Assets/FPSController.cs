@@ -87,6 +87,13 @@ public class FPSController : NetworkBehaviour
     {
         base.OnStartServer();
         Debug.Log($"[SERVER] Player spawned - netId: {netId}, connId: {connectionToClient?.connectionId}");
+
+        // Grant client authority so NetworkTransform can sync from client to server
+        if (connectionToClient != null)
+        {
+            netIdentity.AssignClientAuthority(connectionToClient);
+            Debug.Log($"[SERVER] Granted client authority to connection {connectionToClient.connectionId}");
+        }
     }
 
     public override void OnStartLocalPlayer()
