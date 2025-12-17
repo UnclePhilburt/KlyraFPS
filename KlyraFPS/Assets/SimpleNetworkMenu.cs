@@ -1,6 +1,5 @@
 using UnityEngine;
-using Unity.Netcode;
-using Unity.Netcode.Transports.UTP;
+using Mirror;
 
 public class SimpleNetworkMenu : MonoBehaviour
 {
@@ -13,21 +12,17 @@ public class SimpleNetworkMenu : MonoBehaviour
     [Tooltip("Address of your Fly.io server")]
     public string serverAddress = "klyrafps.fly.dev";
 
-    [Tooltip("Port for the game server (443 for Fly.io WSS, 7777 for local)")]
-    public ushort serverPort = 443;
-
-    [Tooltip("Enable for WebGL builds - uses WebSockets")]
-    public bool useWebSockets = true;
+    [Tooltip("Port for the game server")]
+    public ushort serverPort = 7777;
 
     private string statusMessage = "";
     private bool isConnecting = false;
 
     void Start()
     {
-        // Auto-start server if running as headless/batch mode (on Render)
+        // Auto-start server if running as headless/batch mode
         if (Application.isBatchMode)
         {
-            // Check for PORT environment variable (Render sets this)
             string portEnv = System.Environment.GetEnvironmentVariable("PORT");
             if (!string.IsNullOrEmpty(portEnv) && ushort.TryParse(portEnv, out ushort port))
             {
@@ -36,23 +31,6 @@ public class SimpleNetworkMenu : MonoBehaviour
             }
 
             StartServer();
-        }
-
-        // Configure transport
-        ConfigureTransport();
-    }
-
-    void ConfigureTransport()
-    {
-        var transport = NetworkManager.Singleton?.GetComponent<UnityTransport>();
-        if (transport != null)
-        {
-            // Always use WebSockets for browser compatibility
-#if UNITY_WEBGL && !UNITY_EDITOR
-            transport.UseWebSockets = true;
-#else
-            transport.UseWebSockets = useWebSockets;
-#endif
         }
     }
 
@@ -78,12 +56,11 @@ public class SimpleNetworkMenu : MonoBehaviour
 
     void OnGUI()
     {
-        // Don't show UI in headless mode
         if (Application.isBatchMode) return;
 
         InitializeStyles();
 
-        if (NetworkManager.Singleton == null)
+        if (NetworkManager.singleton == null)
         {
             GUILayout.BeginArea(new Rect(10, 10, 300, 100));
             GUILayout.Label("NetworkManager not found!", labelStyle);
@@ -93,7 +70,7 @@ public class SimpleNetworkMenu : MonoBehaviour
 
         GUILayout.BeginArea(new Rect(10, 10, 350, 400));
 
-        if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
+        if (!NetworkClient.isConnected && !NetworkServer.active)
         {
             DrawConnectionMenu();
         }
@@ -122,17 +99,13 @@ public class SimpleNetworkMenu : MonoBehaviour
 
         GUI.enabled = !isConnecting;
 
-        // Join server button (for players)
         if (GUILayout.Button("JOIN SERVER", buttonStyle, GUILayout.Height(60)))
         {
             JoinServer();
         }
 
-        // Only show local testing options in Editor/standalone (not WebGL)
 #if !UNITY_WEBGL || UNITY_EDITOR
         GUILayout.Space(20);
-
-        // Local testing options
         GUILayout.Label("--- Local Testing ---", labelStyle);
         GUILayout.Space(5);
 
@@ -155,21 +128,31 @@ public class SimpleNetworkMenu : MonoBehaviour
         GUILayout.Label("CONNECTED", labelStyle);
         GUILayout.Space(10);
 
-        string status = NetworkManager.Singleton.IsHost ? "HOST" :
-                       NetworkManager.Singleton.IsServer ? "SERVER" : "CLIENT";
+        string status = NetworkServer.active && NetworkClient.isConnected ? "HOST" :
+                       NetworkServer.active ? "SERVER" : "CLIENT";
         GUILayout.Label($"Status: {status}", labelStyle);
 
-        if (NetworkManager.Singleton.IsServer)
+        if (NetworkServer.active)
         {
-            int playerCount = NetworkManager.Singleton.ConnectedClients.Count;
-            GUILayout.Label($"Players: {playerCount}", labelStyle);
+            GUILayout.Label($"Players: {NetworkServer.connections.Count}", labelStyle);
         }
 
         GUILayout.Space(20);
 
         if (GUILayout.Button("DISCONNECT", buttonStyle, GUILayout.Height(60)))
         {
-            NetworkManager.Singleton.Shutdown();
+            if (NetworkServer.active && NetworkClient.isConnected)
+            {
+                NetworkManager.singleton.StopHost();
+            }
+            else if (NetworkServer.active)
+            {
+                NetworkManager.singleton.StopServer();
+            }
+            else
+            {
+                NetworkManager.singleton.StopClient();
+            }
             statusMessage = "";
         }
     }
@@ -179,85 +162,37 @@ public class SimpleNetworkMenu : MonoBehaviour
         isConnecting = true;
         statusMessage = "Connecting...";
 
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        NetworkManager.singleton.networkAddress = serverAddress;
+        NetworkManager.singleton.StartClient();
 
-        // Configure connection
-#if UNITY_WEBGL && !UNITY_EDITOR
-        transport.UseWebSockets = true;
-#else
-        transport.UseWebSockets = useWebSockets;
-#endif
-
-        transport.ConnectionData.Address = serverAddress;
-        transport.ConnectionData.Port = serverPort;
-
-        Debug.Log($"Connecting to {serverAddress}:{serverPort} (WebSockets: {transport.UseWebSockets})");
-
-        NetworkManager.Singleton.OnClientConnectedCallback += OnConnected;
-        NetworkManager.Singleton.OnClientDisconnectCallback += OnDisconnected;
-
-        if (!NetworkManager.Singleton.StartClient())
-        {
-            statusMessage = "Failed to start client";
-            isConnecting = false;
-        }
+        Debug.Log($"Connecting to {serverAddress}");
     }
 
     void StartHost()
     {
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        transport.UseWebSockets = useWebSockets;
-        transport.ConnectionData.Address = "0.0.0.0";
-        transport.ConnectionData.Port = serverPort;
-
-        if (NetworkManager.Singleton.StartHost())
-        {
-            Debug.Log($"Host started on port {serverPort}");
-        }
+        NetworkManager.singleton.StartHost();
+        Debug.Log($"Host started");
     }
 
     void StartServer()
     {
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        transport.UseWebSockets = true; // Always WebSockets for browser clients
-        transport.ConnectionData.Address = "0.0.0.0";
-        transport.ConnectionData.Port = serverPort;
-
-        if (NetworkManager.Singleton.StartServer())
-        {
-            Debug.Log($"Server started on port {serverPort} with WebSockets");
-        }
-        else
-        {
-            Debug.LogError("Failed to start server");
-        }
+        NetworkManager.singleton.StartServer();
+        Debug.Log($"Server started");
     }
 
-    void OnConnected(ulong clientId)
+    void Update()
     {
-        if (clientId == NetworkManager.Singleton.LocalClientId)
+        // Update connection status
+        if (isConnecting && NetworkClient.isConnected)
         {
             statusMessage = "";
             isConnecting = false;
             Debug.Log("Connected to server!");
         }
-    }
-
-    void OnDisconnected(ulong clientId)
-    {
-        if (clientId == NetworkManager.Singleton.LocalClientId)
+        else if (isConnecting && !NetworkClient.active)
         {
-            statusMessage = "Disconnected";
+            statusMessage = "Connection failed";
             isConnecting = false;
-        }
-    }
-
-    void OnDestroy()
-    {
-        if (NetworkManager.Singleton != null)
-        {
-            NetworkManager.Singleton.OnClientConnectedCallback -= OnConnected;
-            NetworkManager.Singleton.OnClientDisconnectCallback -= OnDisconnected;
         }
     }
 }
