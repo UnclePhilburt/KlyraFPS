@@ -10,8 +10,8 @@ public class SimpleNetworkMenu : MonoBehaviour
     private bool stylesInitialized = false;
 
     [Header("Server Settings")]
-    [Tooltip("Address of your Render server (e.g., your-app.onrender.com)")]
-    public string serverAddress = "localhost";
+    [Tooltip("Address of your Fly.io server")]
+    public string serverAddress = "klyrafps.fly.dev";
 
     [Tooltip("Port for the game server")]
     public ushort serverPort = 7777;
