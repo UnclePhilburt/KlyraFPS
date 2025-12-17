@@ -11,13 +11,13 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy server build files
-COPY ServerBuild/ ./
+COPY serverbuild/ ./
 
 # Make executable
-RUN chmod +x ./KlyraFPS
+RUN chmod +x ./linuxserver.x86_64
 
-# Expose port (Render will assign PORT env var)
+# Expose port
 EXPOSE 7777
 
 # Run the server in batch mode
-CMD ["./KlyraFPS", "-batchmode", "-nographics", "-logFile", "-"]
+CMD ["./linuxserver.x86_64", "-batchmode", "-nographics", "-logFile", "-"]
