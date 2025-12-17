@@ -1,0 +1,276 @@
+================================================================================
+KLYRA FPS - NETCODE MULTIPLAYER SETUP GUIDE
+================================================================================
+
+This guide will walk you through setting up your multiplayer FPS game.
+All the scripts are already created - you just need to do some setup in Unity.
+
+================================================================================
+STEP 1: IMPORT YOUR ASSETS
+================================================================================
+
+1. Open Unity and load the KlyraFPS project
+2. Wait for Netcode package to finish importing (check bottom-right progress bar)
+3. Import your Polygon Military package:
+   - Assets > Import Package > Custom Package
+   - Select: POLYGON_Military_Unity_2022_3_v1_10_0.unitypackage
+   - Click "Import All"
+4. Import your Animation package:
+   - Assets > Import Package > Custom Package
+   - Select: ANIMATION_Base_Locomotion_Unity_2021_1_v1_1_3.unitypackage
+   - Click "Import All"
+
+================================================================================
+STEP 2: CREATE THE PLAYER PREFAB
+================================================================================
+
+1. In the Project window, navigate to your Polygon Military character models
+   (Usually in: Assets/Synty/PolygonMilitary/Models or similar)
+
+2. Find a soldier character model (example: SM_Chr_Soldier_Male_01)
+   Drag it into the Hierarchy to create an instance
+
+3. Rename it to "Player" in the Hierarchy
+
+4. ADD REQUIRED COMPONENTS to the Player:
+
+   a) Add CharacterController:
+      - Select Player in Hierarchy
+      - Inspector > Add Component > "Character Controller"
+      - Set Center Y to 1 (adjust height to match your model)
+      - Set Height to 2 (adjust to match your model)
+      - Set Radius to 0.5
+
+   b) Add NetworkObject:
+      - Add Component > "Network Object"
+      - This makes it network-aware
+
+   c) Add NetworkTransform:
+      - Add Component > "Network Transform"
+      - This syncs position/rotation across network
+
+   d) Add FPSController script:
+      - Add Component > "FPS Controller"
+      - You should see all the settings appear in Inspector
+
+5. CREATE CAMERA for first-person view:
+
+   a) Right-click Player in Hierarchy > Create Empty
+      - Rename it to "PlayerCamera"
+
+   b) Select PlayerCamera:
+      - Add Component > "Camera"
+      - Add Component > "Audio Listener"
+      - Set Position Y to 1.6 (eye height)
+      - Set Position Z to 0
+
+   c) Link camera to FPSController:
+      - Select Player in Hierarchy
+      - In FPSController component, drag PlayerCamera into "Camera Transform" slot
+
+6. MAKE IT A PREFAB:
+
+   - Drag the Player from Hierarchy into your Assets folder
+   - This creates a Player.prefab file
+   - You can now DELETE the Player from Hierarchy (we'll spawn it via network)
+
+================================================================================
+STEP 3: SETUP THE ANIMATOR CONTROLLER
+================================================================================
+
+1. Find your imported animator controller:
+   - Look in Animation package folder for: AC_Polygon_Masculine.controller
+   (or similar name)
+
+2. Select your Player PREFAB in Assets folder
+
+3. Find the Animator component (on the character mesh child object)
+   - Set "Controller" to AC_Polygon_Masculine.controller
+
+4. VERIFY ANIMATOR PARAMETERS (click on animator controller to check):
+   - Should have: MoveSpeed (Float)
+   - Should have: IsGrounded (Bool)
+   - Should have: IsJumping (Bool)
+
+   If parameter names are different, you'll need to either:
+   - Rename them in the animator, OR
+   - Update the FPSController.cs script to match
+
+================================================================================
+STEP 4: SETUP THE SCENE
+================================================================================
+
+1. Open your main scene (SampleScene or create new one)
+
+2. CREATE NETWORK MANAGER:
+
+   a) Create empty GameObject in scene:
+      - Right-click in Hierarchy > Create Empty
+      - Rename to "NetworkManager"
+
+   b) Add NetworkManager component:
+      - Select NetworkManager
+      - Add Component > "Network Manager"
+
+   c) Configure NetworkManager:
+      - In Inspector, find "NetworkManager" component
+      - Under "NetworkPrefabs" section, click "+"
+      - Drag your Player.prefab into the new slot
+
+   d) Set Player Prefab:
+      - Find "Player Prefab" field in NetworkManager
+      - Drag your Player.prefab into this slot
+
+3. ADD NETWORK MENU UI:
+
+   - Select NetworkManager in Hierarchy
+   - Add Component > "Simple Network Menu"
+   - This adds the Host/Join buttons
+
+4. CREATE A FLOOR (so players don't fall):
+
+   - Right-click Hierarchy > 3D Object > Plane
+   - Rename to "Ground"
+   - Scale it up (set Scale X=10, Z=10 in Transform)
+   - Position at Y=0
+
+5. ADD LIGHTING (if scene is dark):
+
+   - Right-click Hierarchy > Light > Directional Light
+   - Rotate it to point downward
+
+================================================================================
+STEP 5: CONFIGURE PROJECT SETTINGS
+================================================================================
+
+1. Setup Input (for WASD movement):
+
+   - Edit > Project Settings > Input Manager
+   - Verify "Horizontal" axis has A/D and arrow keys
+   - Verify "Vertical" axis has W/S and arrow keys
+   - Verify "Jump" is set to Space key
+
+   (These should already be setup by default)
+
+2. Setup Network Transport:
+
+   - Select NetworkManager in Hierarchy
+   - In NetworkManager component, find "NetworkTransport"
+   - Should show "Unity Transport" - this is correct for local/WebGL
+
+================================================================================
+STEP 6: TEST MULTIPLAYER LOCALLY
+================================================================================
+
+1. SAVE YOUR SCENE:
+   - File > Save (Ctrl+S)
+
+2. ADD SCENE TO BUILD SETTINGS:
+   - File > Build Settings
+   - Click "Add Open Scenes"
+   - Close the window
+
+3. TEST IN EDITOR:
+
+   - Click Play button
+   - You should see "HOST GAME" and "JOIN GAME" buttons
+   - Click "HOST GAME"
+   - Your player should spawn and you can move with WASD
+   - Press Escape to unlock cursor, click Disconnect
+
+4. TEST WITH TWO INSTANCES:
+
+   a) Build a standalone version:
+      - File > Build Settings
+      - Click "Build"
+      - Save it somewhere (like Desktop)
+
+   b) Run the built .exe file
+      - Click "HOST GAME"
+
+   c) In Unity Editor, click Play
+      - Click "JOIN GAME"
+      - You should now see two players!
+
+================================================================================
+COMMON ISSUES & FIXES
+================================================================================
+
+ISSUE: "Character stuck in falling animation"
+FIX: Make sure your animator has these EXACT parameter names:
+     - MoveSpeed (not "Speed")
+     - IsGrounded (not "isGrounded")
+     - IsJumping (not "isJumping")
+
+ISSUE: "Can't see other players"
+FIX: Make sure Player.prefab is in NetworkManager's "NetworkPrefabs" list
+
+ISSUE: "Player falls through floor"
+FIX: Make sure you created a Ground plane with a Mesh Collider
+
+ISSUE: "Can't move player"
+FIX: - Check CharacterController is attached to Player
+     - Check Input settings (Edit > Project Settings > Input Manager)
+
+ISSUE: "Camera not working"
+FIX: - Make sure PlayerCamera is a child of Player
+     - Make sure Camera Transform is linked in FPSController component
+
+ISSUE: "NetworkManager not found"
+FIX: - Make sure NetworkManager GameObject exists in your scene
+     - Make sure it has NetworkManager component attached
+
+ISSUE: "Players spawning on top of each other"
+FIX: This is normal for basic setup. Players spawn at (0,0,0).
+     You can add spawn points later if needed.
+
+================================================================================
+NEXT STEPS (FUTURE ENHANCEMENTS)
+================================================================================
+
+Once basic multiplayer is working, you can add:
+
+1. Weapon system with networked shooting
+2. Health system
+3. Spawn points (multiple locations for players to spawn)
+4. Score/kill tracking
+5. Dedicated server for Render.com deployment
+6. Database integration for player stats
+7. WebGL build for browser-based gameplay
+
+================================================================================
+CONTROLS
+================================================================================
+
+WASD - Move
+Mouse - Look around
+Space - Jump
+Left Shift - Sprint (while moving)
+Escape - Unlock cursor
+
+When menu is open:
+- Click HOST GAME to start server
+- Click JOIN GAME to connect as client
+- Click DISCONNECT to leave game
+
+================================================================================
+FILE LOCATIONS
+================================================================================
+
+Scripts:
+- C:\KlyraFPS\KlyraFPS\Assets\FPSController.cs
+- C:\KlyraFPS\KlyraFPS\Assets\SimpleNetworkMenu.cs
+
+Package Config:
+- C:\KlyraFPS\KlyraFPS\Packages\manifest.json
+
+Asset Packages:
+- C:\KlyraFPS\POLYGON_Military_Unity_2022_3_v1_10_0.unitypackage
+- C:\KlyraFPS\ANIMATION_Base_Locomotion_Unity_2021_1_v1_1_3.unitypackage
+
+================================================================================
+
+Need help? Check the Unity Console (Window > General > Console) for errors.
+Most issues will show up there with helpful error messages.
+
+Good luck!

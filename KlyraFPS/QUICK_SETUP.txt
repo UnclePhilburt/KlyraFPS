@@ -1,0 +1,239 @@
+================================================================================
+QUICK SETUP - Using Military Demo Scene
+================================================================================
+
+Super simple setup using the existing demo scene!
+
+================================================================================
+STEP 1: OPEN THE DEMO SCENE
+================================================================================
+
+1. In Unity, open Project window (bottom)
+2. Navigate to: Assets > Synty > PolygonMilitary > Scenes
+3. Double-click "Demo.unity"
+4. The scene will load with a complete military base environment
+
+================================================================================
+STEP 2: CREATE THE PLAYER PREFAB
+================================================================================
+
+1. In Project window, navigate to:
+   Assets > Synty > PolygonMilitary > Prefabs > Characters
+
+2. Find "SM_Chr_Soldier_Male_01" (or any soldier you like)
+   - Drag it into the Hierarchy (left side)
+
+3. Rename it to "Player":
+   - Click on it in Hierarchy
+   - Press F2 (or right-click > Rename)
+   - Type "Player"
+
+4. ADD COMPONENTS (all in Inspector on the right):
+
+   Click "Add Component" button, then add each of these:
+
+   a) Character Controller
+      - After adding, set these values:
+      - Center Y: 1
+      - Height: 2
+      - Radius: 0.5
+
+   b) Network Object
+      - Just add it, no settings needed
+
+   c) Network Transform
+      - Just add it, no settings needed
+
+   d) FPS Controller (our script)
+      - Just add it for now
+
+5. CREATE CAMERA:
+
+   a) Right-click "Player" in Hierarchy
+      - Select: Create Empty
+      - Name it: "PlayerCamera"
+
+   b) Select PlayerCamera:
+      - Add Component > Camera
+      - Add Component > Audio Listener
+      - In Transform section:
+        - Position X: 0
+        - Position Y: 1.6 (eye height)
+        - Position Z: 0
+
+   c) Link the camera:
+      - Select "Player" in Hierarchy
+      - In FPS Controller component (in Inspector)
+      - Find "Camera Transform" field
+      - Drag "PlayerCamera" from Hierarchy into that field
+
+6. MAKE IT A PREFAB:
+
+   - Drag "Player" from Hierarchy down to Project window (Assets folder)
+   - This creates Player.prefab
+   - DELETE "Player" from Hierarchy (we'll spawn it via network)
+
+================================================================================
+STEP 3: ADD ANIMATOR (Important!)
+================================================================================
+
+1. Select your Player.prefab in Assets folder
+
+2. In Hierarchy, expand the prefab (click the arrow)
+   - You'll see child objects with the mesh
+
+3. Find the object with "Animator" component
+   - Usually the main mesh object
+
+4. In Inspector, find "Animator" component:
+   - Controller field: Drag in "AC_Polygon_Masculine" controller
+   - Find it at: Assets > Synty > AnimationBaseLocomotion > Animator
+
+   If you can't find it, that's okay - we'll fix it later
+
+================================================================================
+STEP 4: ADD NETWORK MANAGER TO SCENE
+================================================================================
+
+1. In Hierarchy, right-click empty space
+   - Create Empty
+   - Name it: "NetworkManager"
+
+2. With NetworkManager selected, Add Component:
+   - Type: "Network Manager"
+   - Click to add it
+
+3. Configure NetworkManager:
+
+   a) Find "NetworkManager" component in Inspector
+
+   b) Under "NetworkPrefabs":
+      - Click the "+" button
+      - Drag your Player.prefab into the new slot
+
+   c) Find "Player Prefab" field:
+      - Drag Player.prefab into this field
+
+4. ADD THE MENU:
+   - With NetworkManager still selected
+   - Add Component > "Simple Network Menu"
+
+================================================================================
+STEP 5: FIX THE MAIN CAMERA
+================================================================================
+
+The demo scene has a Main Camera that will conflict with player cameras.
+
+1. In Hierarchy, find "Main Camera"
+2. DELETE IT (right-click > Delete)
+
+We don't need it because each player spawns with their own camera.
+
+================================================================================
+STEP 6: SAVE AND TEST!
+================================================================================
+
+1. SAVE THE SCENE:
+   - File > Save (or Ctrl+S)
+
+2. PRESS PLAY:
+   - Click the Play button (top center)
+   - You should see "HOST GAME" and "JOIN GAME" buttons
+
+3. CLICK "HOST GAME"
+   - You should spawn into the military base
+   - Try moving: WASD keys
+   - Try looking: Move mouse
+   - Try jumping: Space bar
+   - Try sprinting: Hold Shift while moving
+
+4. UNLOCK CURSOR (if you want to click Disconnect):
+   - Press Escape
+   - Cursor will appear
+   - Click "DISCONNECT" button
+
+================================================================================
+STEP 7: TEST MULTIPLAYER
+================================================================================
+
+1. BUILD THE GAME:
+   - File > Build Settings
+   - Click "Add Open Scenes"
+   - Click "Build"
+   - Save it somewhere (like Desktop/KlyraFPS.exe)
+
+2. RUN THE EXE FILE:
+   - Navigate to where you saved it
+   - Double-click KlyraFPS.exe
+   - Click "HOST GAME"
+
+3. IN UNITY EDITOR:
+   - Click Play button
+   - Click "JOIN GAME"
+   - You should now see TWO players in the military base!
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+PROBLEM: "Character stuck in T-pose or falling animation"
+SOLUTION:
+- Select Player.prefab
+- Make sure Animator component has AC_Polygon_Masculine controller
+- Make sure animator parameters are: MoveSpeed, IsGrounded, IsJumping
+
+PROBLEM: "Can't move when I spawn"
+SOLUTION:
+- Make sure CharacterController is on Player prefab
+- Check that FPSController script is attached
+
+PROBLEM: "No HOST GAME button appears"
+SOLUTION:
+- Make sure NetworkManager GameObject exists in scene
+- Make sure SimpleNetworkMenu script is attached to NetworkManager
+
+PROBLEM: "Player falls through floor"
+SOLUTION:
+- The demo scene should have colliders already
+- If falling, check that the environment objects have colliders
+
+PROBLEM: "Can't see anything when I spawn"
+SOLUTION:
+- Make sure PlayerCamera is positioned at Y=1.6
+- Make sure PlayerCamera has Camera component
+- Make sure you deleted the old Main Camera from scene
+
+PROBLEM: "Two players spawn in same spot"
+SOLUTION:
+- This is normal! They spawn at (0, 0, 0)
+- Just walk away from each other
+- Later we can add spawn points
+
+================================================================================
+CONTROLS
+================================================================================
+
+W - Forward
+S - Backward
+A - Left
+D - Right
+Mouse - Look around
+Space - Jump
+Left Shift (hold) - Sprint
+Escape - Unlock cursor
+
+================================================================================
+
+That's it! You now have a working multiplayer FPS in the military demo scene!
+
+The scripts handle all the networking automatically:
+- FPSController.cs = Movement, jumping, mouse look, animation sync
+- SimpleNetworkMenu.cs = Host/Join buttons
+
+Next steps could be:
+- Add weapons
+- Add health system
+- Add multiple spawn points
+- Deploy to WebGL
+- Connect to Render.com server
+
