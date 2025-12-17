@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 app = "klyrafps"
 primary_region = "ord"
 
@@ -19,3 +20,28 @@ primary_region = "ord"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+=======
+# fly.toml app configuration file generated for klyrafps on 2025-12-17T05:57:24Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'klyrafps'
+primary_region = 'ord'
+
+[build]
+
+[http_service]
+  internal_port = 7777
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
+>>>>>>> 63ec6d44cc09bb724441e3ba3435ab359cb7bd35
