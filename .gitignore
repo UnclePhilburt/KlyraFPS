@@ -89,3 +89,9 @@ WebGL/
 
 # Old project folders
 My project/
+
+# Large build files
+docs/Build/docs.data
+docs/Build/docs.wasm
+docs/Build/*.data
+docs/Build/*.wasm

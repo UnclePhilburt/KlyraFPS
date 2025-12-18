@@ -2,15 +2,26 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 
+public enum Team
+{
+    None,
+    Phantom,
+    Havoc
+}
+
 public class PhotonNetworkManager : MonoBehaviourPunCallbacks
 {
     [Header("Player Settings")]
     public GameObject playerPrefab;
     public Transform spawnPoint;
+    public Transform phantomSpawnPoint;
+    public Transform havocSpawnPoint;
 
     [Header("UI")]
     private bool isConnecting = false;
     private string statusMessage = "Click to Connect";
+    private bool showTeamSelection = false;
+    private Team selectedTeam = Team.None;
 
     private GUIStyle buttonStyle;
     private GUIStyle labelStyle;
@@ -45,7 +56,7 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
     {
         InitializeStyles();
 
-        GUILayout.BeginArea(new Rect(10, 10, 350, 300));
+        GUILayout.BeginArea(new Rect(10, 10, 350, 350));
 
         if (!PhotonNetwork.IsConnected)
         {
@@ -56,12 +67,38 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
             GUILayout.Label("Connected to Photon", labelStyle);
             GUILayout.Label("Joining room...", labelStyle);
         }
+        else if (showTeamSelection)
+        {
+            DrawTeamSelection();
+        }
         else
         {
             DrawConnectedStatus();
         }
 
         GUILayout.EndArea();
+    }
+
+    void DrawTeamSelection()
+    {
+        GUILayout.Label("SELECT YOUR TEAM", labelStyle);
+        GUILayout.Space(20);
+
+        if (GUILayout.Button("PHANTOM", buttonStyle, GUILayout.Height(60)))
+        {
+            selectedTeam = Team.Phantom;
+            showTeamSelection = false;
+            SpawnPlayer();
+        }
+
+        GUILayout.Space(10);
+
+        if (GUILayout.Button("HAVOC", buttonStyle, GUILayout.Height(60)))
+        {
+            selectedTeam = Team.Havoc;
+            showTeamSelection = false;
+            SpawnPlayer();
+        }
     }
 
     void DrawConnectMenu()
@@ -83,17 +120,7 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
 
     void DrawConnectedStatus()
     {
-        GUILayout.Label("IN GAME", labelStyle);
-        GUILayout.Space(10);
-        GUILayout.Label($"Room: {PhotonNetwork.CurrentRoom.Name}", labelStyle);
-        GUILayout.Label($"Players: {PhotonNetwork.CurrentRoom.PlayerCount}", labelStyle);
-        GUILayout.Label($"Region: {PhotonNetwork.CloudRegion}", labelStyle);
-        GUILayout.Space(20);
-
-        if (GUILayout.Button("DISCONNECT", buttonStyle, GUILayout.Height(60)))
-        {
-            Disconnect();
-        }
+        // HUD hidden during gameplay
     }
 
     void Connect()
@@ -138,8 +165,8 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
         isConnecting = false;
         statusMessage = "In Game";
 
-        // Spawn player
-        SpawnPlayer();
+        // Show team selection instead of spawning immediately
+        showTeamSelection = true;
     }
 
     public override void OnJoinRandomFailed(short returnCode, string message)
@@ -175,14 +202,30 @@ public class PhotonNetworkManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        Vector3 spawnPos = spawnPoint != null ? spawnPoint.position : Vector3.zero;
-        Quaternion spawnRot = spawnPoint != null ? spawnPoint.rotation : Quaternion.identity;
+        // Choose spawn point based on team
+        Transform teamSpawn = spawnPoint;
+        if (selectedTeam == Team.Phantom && phantomSpawnPoint != null)
+            teamSpawn = phantomSpawnPoint;
+        else if (selectedTeam == Team.Havoc && havocSpawnPoint != null)
+            teamSpawn = havocSpawnPoint;
+
+        Vector3 spawnPos = teamSpawn != null ? teamSpawn.position : Vector3.zero;
+        Quaternion spawnRot = teamSpawn != null ? teamSpawn.rotation : Quaternion.identity;
+
+        // Rotate Phantom spawn 180 degrees so they face the right direction
+        if (selectedTeam == Team.Phantom)
+        {
+            spawnRot *= Quaternion.Euler(0, 180f, 0);
+        }
 
         // Add small random offset to prevent spawning on top of each other
         spawnPos += new Vector3(Random.Range(-2f, 2f), 0, Random.Range(-2f, 2f));
 
+        // Pass team as instantiation data
+        object[] instantiationData = new object[] { (int)selectedTeam };
+
         // PhotonNetwork.Instantiate spawns for all clients
-        GameObject player = PhotonNetwork.Instantiate(playerPrefab.name, spawnPos, spawnRot);
-        Debug.Log($"Spawned player at {spawnPos}");
+        GameObject player = PhotonNetwork.Instantiate(playerPrefab.name, spawnPos, spawnRot, 0, instantiationData);
+        Debug.Log($"Spawned {selectedTeam} player at {spawnPos}");
     }
 }

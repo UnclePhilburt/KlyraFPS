@@ -1180,10 +1180,24 @@ MonoBehaviour:
   fireRate: 0.1
   damage: 25
   range: 100
+  gunshotSound: {fileID: 8300000, guid: f6300effa65a243168dd09aae4f9a9df, type: 3}
+  gunshotVolume: 0.7
   aimFOV: 30
   normalFOV: 60
   aimSpeed: 10
   aimPosition: {x: 0, y: -0.21, z: 0.25}
+  maxHealth: 100
+  currentHealth: 0
+  isDead: 0
+  playerTeam: 0
+  phantomSkinNames:
+  - SM_Chr_Soldier_Male_01
+  - SM_Chr_Soldier_Male_02
+  - SM_Chr_Soldier_Female_01
+  havocSkinNames:
+  - SM_Chr_Insurgent_Male_01
+  - SM_Chr_Insurgent_Male_04
+  - SM_Chr_Insurgent_Female_01
 --- !u!1 &1014089305584738816
 GameObject:
   m_ObjectHideFlags: 0
