@@ -29,6 +29,7 @@ public class AIController : MonoBehaviour
     private AudioSource audioSource;
     private LineRenderer tracerLine;
 
+
     // Personality (randomized per bot)
     private enum Personality { Balanced, Aggressive, Defensive, LoneWolf, Camper }
     private Personality personality;
@@ -36,7 +37,7 @@ public class AIController : MonoBehaviour
     private float bravery;    // 0-1, how likely to engage vs retreat
     private float patience;   // 0-1, how long they wait at objectives
 
-    // Squad system
+    // Squad system (AI-to-AI)
     public enum SquadRole { Leader, Member }
     public SquadRole squadRole = SquadRole.Member;
     public AIController squadLeader;
@@ -44,6 +45,24 @@ public class AIController : MonoBehaviour
     private float squadCheckTimer = 0f;
     private static List<AIController> unassignedBots = new List<AIController>();
     private static Dictionary<Team, List<AIController>> teamLeaders = new Dictionary<Team, List<AIController>>();
+
+    // Player-led squad system
+    private bool inPlayerSquad = false;
+    private FPSControllerPhoton playerSquadLeader;
+    private float followDistance = 4f;
+    private float squadFormationOffset = 0f;  // Offset for formation positioning
+    private int squadIndex = 0;  // Position in squad for formations
+
+    // Soldier identity
+    [HideInInspector]
+    public SoldierIdentity identity;
+
+    // Orders
+    public enum OrderType { FollowLeader, DefendPoint, CapturePoint, HoldPosition }
+    public OrderType currentOrder = OrderType.FollowLeader;
+    public CapturePoint orderedPoint;
+    public Vector3 holdPosition;
+    public Vector3 holdFacingDirection; // Direction to face when holding position
 
     [Header("Skins")]
     public string[] phantomSkinNames = { "SM_Chr_Soldier_Male_01", "SM_Chr_Soldier_Male_02" };
@@ -284,10 +303,15 @@ public class AIController : MonoBehaviour
         timeSinceSpawn = 0f;
 
         SetupTeamSkin();
+
+        // Generate soldier identity
+        identity = SoldierIdentity.Generate(team);
+        gameObject.name = $"AI_{identity.RankAndName}";
+
         AssignToSquad();
         FindNextCapturePoint();
 
-        Debug.Log($"AI Initialized: {gameObject.name} on team {team}, state={currentState}, agent={agent != null}, agentEnabled={agentEnabled}");
+        Debug.Log($"AI Initialized: {identity.RankAndName} on team {team}, state={currentState}");
     }
 
     void AssignToSquad()
@@ -460,6 +484,13 @@ public class AIController : MonoBehaviour
         if (!isAIControlled) return;
 
         if (currentState == AIState.Dead) return;
+
+        // Handle player-led squad behavior
+        if (inPlayerSquad)
+        {
+            UpdatePlayerSquadBehavior();
+            return; // Skip normal AI behavior when in player squad
+        }
 
         // Update global frame counter (shared across all bots)
         globalFrameCount++;
@@ -1773,7 +1804,7 @@ public class AIController : MonoBehaviour
             AIController ai = targetEnemy.GetComponent<AIController>();
             if (ai != null && ai.team != team)
             {
-                ai.TakeDamage(damage, transform.position);
+                ai.TakeDamage(damage, transform.position, targetPos);
 
                 // Check if we killed them
                 if (ai.currentHealth <= 0)
@@ -1798,11 +1829,14 @@ public class AIController : MonoBehaviour
         tracerLine.enabled = false;
     }
 
-    public void TakeDamage(float amount, Vector3 damageSource = default)
+    public void TakeDamage(float amount, Vector3 damageSource = default, Vector3 hitPoint = default)
     {
         currentHealth -= amount;
         lastDamageTime = Time.time;
         suppressedTimer = 1f; // Suppressed for 1 second
+
+        // Spawn blood effect at hit point
+        SpawnBloodHit(hitPoint != default ? hitPoint : transform.position + Vector3.up, damageSource);
 
         // Track where damage came from
         if (damageSource != default)
@@ -1831,16 +1865,434 @@ public class AIController : MonoBehaviour
         }
     }
 
+    void SpawnBloodHit(Vector3 position, Vector3 damageSource)
+    {
+        BloodEffectManager.SpawnBloodHit(position, damageSource);
+    }
+
+    void SpawnBloodDeath(Vector3 position)
+    {
+        BloodEffectManager.SpawnBloodDeath(position);
+    }
+
     void Die()
     {
         RememberDeath();
         currentState = AIState.Dead;
+
+        // Spawn death blood effect
+        SpawnBloodDeath(transform.position + Vector3.up * 0.5f);
+
+        // Leave player squad if in one
+        if (inPlayerSquad)
+        {
+            LeaveSquad();
+        }
 
         // Enable ragdoll physics
         Vector3 forceDir = lastDamageDirection != Vector3.zero ? -lastDamageDirection : Vector3.back;
         RagdollHelper.EnableRagdoll(gameObject, forceDir, 8f);
 
         Destroy(gameObject, 8f);
+    }
+
+    // Property to check if dead
+    public bool isDead => currentState == AIState.Dead;
+
+    // Player-led squad methods
+    public bool IsInSquad()
+    {
+        return inPlayerSquad;
+    }
+
+    public void JoinSquad(FPSControllerPhoton leader, int index = -1)
+    {
+        if (leader == null || leader.playerTeam != team) return;
+
+        inPlayerSquad = true;
+        playerSquadLeader = leader;
+        squadIndex = index >= 0 ? index : leader.GetSquadSize();
+        currentOrder = OrderType.FollowLeader;
+
+        // Formation offset based on squad index
+        squadFormationOffset = squadIndex * 45f;
+
+        Debug.Log($"{identity?.RankAndName ?? gameObject.name} joined player squad at position {squadIndex}!");
+    }
+
+    public void SetOrder(OrderType order, CapturePoint point = null, Vector3? position = null, Vector3? facingDirection = null)
+    {
+        currentOrder = order;
+        orderedPoint = point;
+        if (position.HasValue)
+        {
+            holdPosition = position.Value;
+        }
+        if (facingDirection.HasValue)
+        {
+            holdFacingDirection = facingDirection.Value;
+        }
+        else
+        {
+            holdFacingDirection = Vector3.zero; // No specific facing direction
+        }
+        Debug.Log($"{identity?.RankAndName ?? gameObject.name} received order: {order}");
+    }
+
+    public void LeaveSquad()
+    {
+        inPlayerSquad = false;
+        playerSquadLeader = null;
+        squadFormationOffset = 0f;
+
+        Debug.Log($"{gameObject.name} left player squad.");
+    }
+
+    public FPSControllerPhoton GetPlayerSquadLeader()
+    {
+        return playerSquadLeader;
+    }
+
+    void UpdatePlayerSquadBehavior()
+    {
+        // If leader is dead or gone, leave squad
+        if (playerSquadLeader == null || playerSquadLeader.isDead)
+        {
+            LeaveSquad();
+            return;
+        }
+
+        // Handle different orders
+        switch (currentOrder)
+        {
+            case OrderType.FollowLeader:
+                ExecuteFollowLeaderOrder();
+                break;
+            case OrderType.DefendPoint:
+                ExecuteDefendPointOrder();
+                break;
+            case OrderType.CapturePoint:
+                ExecuteCapturePointOrder();
+                break;
+            case OrderType.HoldPosition:
+                ExecuteHoldPositionOrder();
+                break;
+        }
+
+        // Update animation based on movement
+        bool isMoving = agent != null && agent.velocity.magnitude > 0.1f;
+        bool isSprinting = agent != null && agent.velocity.magnitude > moveSpeed;
+        UpdateAnimation(isMoving, isSprinting);
+    }
+
+    void ExecuteFollowLeaderOrder()
+    {
+        // Get leader's current target
+        Transform leaderTarget = playerSquadLeader.GetCurrentTarget();
+
+        // If leader has a target, prioritize attacking it
+        if (leaderTarget != null)
+        {
+            float distToTarget = Vector3.Distance(transform.position, leaderTarget.position);
+
+            // Move toward target if too far
+            if (distToTarget > attackRange * 0.8f)
+            {
+                Vector3 dirToTarget = (leaderTarget.position - transform.position).normalized;
+                Vector3 combatPos = leaderTarget.position - dirToTarget * (attackRange * 0.6f);
+
+                if (agent != null && agent.isOnNavMesh)
+                {
+                    agent.SetDestination(combatPos);
+                }
+            }
+
+            // Face and shoot the target
+            if (distToTarget <= attackRange)
+            {
+                targetEnemy = leaderTarget;
+                currentState = AIState.Combat;
+
+                // Look at target
+                Vector3 lookDir = (leaderTarget.position - transform.position).normalized;
+                lookDir.y = 0;
+                if (lookDir != Vector3.zero)
+                {
+                    Quaternion targetRot = Quaternion.LookRotation(lookDir);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * rotationSpeed);
+                }
+
+                // Shoot at target
+                if (Time.time >= nextFireTime)
+                {
+                    ShootAtTarget(leaderTarget);
+                    nextFireTime = Time.time + fireRate;
+                }
+            }
+        }
+        else
+        {
+            // No leader target - follow the leader
+            currentState = AIState.MovingToPoint;
+            FollowPlayerLeader();
+
+            // But still react to close enemies
+            CheckForNearbyEnemiesInSquad();
+        }
+    }
+
+    void ExecuteDefendPointOrder()
+    {
+        if (orderedPoint == null)
+        {
+            currentOrder = OrderType.FollowLeader;
+            return;
+        }
+
+        float distToPoint = Vector3.Distance(transform.position, orderedPoint.transform.position);
+
+        // Move to point if too far
+        if (distToPoint > 10f)
+        {
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.SetDestination(orderedPoint.transform.position);
+            }
+            currentState = AIState.MovingToPoint;
+        }
+        else
+        {
+            // At point - patrol around it and engage enemies
+            currentState = AIState.Capturing;
+            CheckForNearbyEnemiesInSquad();
+        }
+    }
+
+    void ExecuteCapturePointOrder()
+    {
+        if (orderedPoint == null)
+        {
+            currentOrder = OrderType.FollowLeader;
+            return;
+        }
+
+        float distToPoint = Vector3.Distance(transform.position, orderedPoint.transform.position);
+
+        // Move to capture zone
+        if (distToPoint > orderedPoint.captureRadius * 0.5f)
+        {
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.SetDestination(orderedPoint.transform.position);
+            }
+            currentState = AIState.MovingToPoint;
+        }
+        else
+        {
+            // Inside capture zone
+            currentState = AIState.Capturing;
+
+            // If point is captured, switch to defend
+            if (orderedPoint.owningTeam == team)
+            {
+                currentOrder = OrderType.DefendPoint;
+            }
+        }
+
+        CheckForNearbyEnemiesInSquad();
+    }
+
+    void ExecuteHoldPositionOrder()
+    {
+        float distToPos = Vector3.Distance(transform.position, holdPosition);
+
+        if (distToPos > 2f)
+        {
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.SetDestination(holdPosition);
+            }
+            currentState = AIState.MovingToPoint;
+        }
+        else
+        {
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.ResetPath();
+            }
+            currentState = AIState.Idle;
+
+            // Face the specified direction if one was given
+            if (holdFacingDirection != Vector3.zero)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(holdFacingDirection);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 5f);
+            }
+        }
+
+        CheckForNearbyEnemiesInSquad();
+    }
+
+    void FollowPlayerLeader()
+    {
+        if (playerSquadLeader == null) return;
+
+        Vector3 leaderPos = playerSquadLeader.transform.position;
+        float distToLeader = Vector3.Distance(transform.position, leaderPos);
+
+        // Calculate formation position (spread out behind leader)
+        float angle = squadFormationOffset;
+        Vector3 offset = new Vector3(
+            Mathf.Sin(angle * Mathf.Deg2Rad) * followDistance,
+            0,
+            -Mathf.Cos(angle * Mathf.Deg2Rad) * followDistance * 0.5f - 2f // Behind leader
+        );
+
+        // Transform offset to be relative to leader's facing direction
+        Vector3 formationPos = leaderPos + playerSquadLeader.transform.TransformDirection(offset);
+
+        // Only move if too far from formation position
+        if (distToLeader > followDistance * 2f)
+        {
+            // Too far - run to catch up
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.speed = moveSpeed * 1.5f;
+                agent.SetDestination(formationPos);
+            }
+        }
+        else if (Vector3.Distance(transform.position, formationPos) > 2f)
+        {
+            // Move to formation position
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.speed = moveSpeed;
+                agent.SetDestination(formationPos);
+            }
+        }
+        else
+        {
+            // In position - stop
+            if (agent != null && agent.isOnNavMesh)
+            {
+                agent.ResetPath();
+            }
+
+            // Face same direction as leader
+            Quaternion targetRot = playerSquadLeader.transform.rotation;
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * rotationSpeed);
+        }
+    }
+
+    void CheckForNearbyEnemiesInSquad()
+    {
+        // Check for enemies within detection range while following
+        if (cachedPlayers != null)
+        {
+            foreach (var player in cachedPlayers)
+            {
+                if (player == null || player.isDead) continue;
+                if (player.playerTeam == team) continue;
+
+                float dist = Vector3.Distance(transform.position, player.transform.position);
+                if (dist <= detectionRange * 0.5f) // React at half range when in squad
+                {
+                    targetEnemy = player.transform;
+                    // Shoot at them but don't leave formation
+                    if (Time.time >= nextFireTime && dist <= attackRange)
+                    {
+                        ShootAtTarget(player.transform);
+                        nextFireTime = Time.time + fireRate;
+                    }
+                }
+            }
+        }
+
+        if (cachedAIs != null)
+        {
+            foreach (var ai in cachedAIs)
+            {
+                if (ai == null || ai == this || ai.isDead) continue;
+                if (ai.team == team) continue;
+
+                float dist = Vector3.Distance(transform.position, ai.transform.position);
+                if (dist <= detectionRange * 0.5f)
+                {
+                    targetEnemy = ai.transform;
+                    if (Time.time >= nextFireTime && dist <= attackRange)
+                    {
+                        ShootAtTarget(ai.transform);
+                        nextFireTime = Time.time + fireRate;
+                    }
+                }
+            }
+        }
+    }
+
+    void ShootAtTarget(Transform target)
+    {
+        if (target == null) return;
+
+        // Face the target
+        Vector3 dirToTarget = (target.position - transform.position).normalized;
+        dirToTarget.y = 0;
+        if (dirToTarget != Vector3.zero)
+        {
+            transform.rotation = Quaternion.LookRotation(dirToTarget);
+        }
+
+        // Fire at target
+        Vector3 aimPoint = target.position + Vector3.up * 1.2f; // Aim at chest height
+
+        // Apply accuracy spread
+        float spread = (1f - accuracy) * 2f;
+        aimPoint += new Vector3(
+            Random.Range(-spread, spread),
+            Random.Range(-spread * 0.5f, spread * 0.5f),
+            Random.Range(-spread, spread)
+        );
+
+        Vector3 shootOrigin = transform.position + Vector3.up * 1.5f;
+        Vector3 shootDir = (aimPoint - shootOrigin).normalized;
+
+        // Play sound
+        if (gunshotSound != null && audioSource != null)
+        {
+            audioSource.pitch = Random.Range(0.95f, 1.05f);
+            audioSource.PlayOneShot(gunshotSound, gunshotVolume);
+        }
+
+        // Raycast
+        RaycastHit hit;
+        if (Physics.Raycast(shootOrigin, shootDir, out hit, attackRange * 1.5f))
+        {
+            // Show tracer
+            if (tracerLine != null)
+            {
+                StartCoroutine(ShowTracer(shootOrigin, hit.point));
+            }
+
+            // Check if we hit enemy
+            FPSControllerPhoton hitPlayer = hit.collider.GetComponentInParent<FPSControllerPhoton>();
+            if (hitPlayer != null && hitPlayer.playerTeam != team)
+            {
+                hitPlayer.photonView.RPC("RPC_TakeDamage", Photon.Pun.RpcTarget.All, damage, -1);
+            }
+
+            AIController hitAI = hit.collider.GetComponentInParent<AIController>();
+            if (hitAI != null && hitAI.team != team)
+            {
+                hitAI.TakeDamage(damage, transform.position, hit.point);
+            }
+        }
+        else
+        {
+            // Show tracer to max range
+            if (tracerLine != null)
+            {
+                StartCoroutine(ShowTracer(shootOrigin, shootOrigin + shootDir * attackRange));
+            }
+        }
     }
 
     void OnDrawGizmosSelected()

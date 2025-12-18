@@ -1190,6 +1190,8 @@ MonoBehaviour:
   currentHealth: 0
   isDead: 0
   playerTeam: 0
+  maxSquadSize: 7
+  recruitRadius: 15
   phantomSkinNames:
   - SM_Chr_Soldier_Male_01
   - SM_Chr_Soldier_Male_02

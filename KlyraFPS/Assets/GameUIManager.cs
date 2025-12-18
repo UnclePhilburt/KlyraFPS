@@ -9,6 +9,7 @@ public class GameUIManager : MonoBehaviourPunCallbacks
     {
         PressStart,
         MainMenu,
+        Settings,
         Connecting,
         TeamSelect,
         InGame
@@ -21,6 +22,17 @@ public class GameUIManager : MonoBehaviourPunCallbacks
 
     [Header("Settings")]
     public float mouseSensitivity = 2f;
+
+    // Graphics settings
+    private int shadowQuality = 1;        // 0=Off, 1=Low, 2=Medium, 3=High
+    private float shadowDistance = 40f;
+    private int qualityLevel = 0;         // 0=Mobile, 1=PC
+    private float resolutionScale = 1f;
+    private bool vSyncEnabled = false;
+
+    // Settings labels
+    private static readonly string[] shadowOptions = { "Off", "Low", "Medium", "High" };
+    private static readonly string[] qualityOptions = { "Mobile", "PC" };
 
     // Current state
     public GameState currentState = GameState.PressStart;
@@ -45,6 +57,10 @@ public class GameUIManager : MonoBehaviourPunCallbacks
         // Show cursor on menu
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+
+        // Load saved settings
+        LoadSettings();
+        ApplySettings();
     }
 
     void Update()
@@ -118,6 +134,9 @@ public class GameUIManager : MonoBehaviourPunCallbacks
             case GameState.MainMenu:
                 DrawMainMenu();
                 break;
+            case GameState.Settings:
+                DrawSettings();
+                break;
             case GameState.Connecting:
                 DrawConnecting();
                 break;
@@ -182,7 +201,7 @@ public class GameUIManager : MonoBehaviourPunCallbacks
         buttonY += 80;
         if (GUI.Button(new Rect(buttonX, buttonY, buttonWidth, 60), "SETTINGS", buttonStyle))
         {
-            // TODO: Settings menu
+            currentState = GameState.Settings;
         }
 
         buttonY += 80;
@@ -251,6 +270,197 @@ public class GameUIManager : MonoBehaviourPunCallbacks
             string roomInfo = $"Players in room: {PhotonNetwork.CurrentRoom.PlayerCount}";
             GUI.Label(new Rect(0, centerY + 80, Screen.width, 30), roomInfo, smallLabelStyle);
         }
+    }
+
+    void DrawSettings()
+    {
+        // Dark overlay
+        GUI.color = new Color(0, 0, 0, 0.85f);
+        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+
+        float centerX = Screen.width / 2f;
+        float panelWidth = 500f;
+        float panelX = centerX - panelWidth / 2f;
+        float startY = 80f;
+        float rowHeight = 50f;
+        float labelWidth = 180f;
+        float controlWidth = 280f;
+
+        // Title
+        GUI.Label(new Rect(0, startY, Screen.width, 50), "SETTINGS", labelStyle);
+        startY += 70f;
+
+        // Settings panel background
+        GUI.color = new Color(0.15f, 0.15f, 0.15f, 0.9f);
+        GUI.DrawTexture(new Rect(panelX - 20, startY - 10, panelWidth + 40, 380), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+
+        GUIStyle settingLabel = new GUIStyle(GUI.skin.label);
+        settingLabel.fontSize = 20;
+        settingLabel.alignment = TextAnchor.MiddleLeft;
+        settingLabel.normal.textColor = Color.white;
+
+        GUIStyle sliderThumb = GUI.skin.horizontalSliderThumb;
+        GUIStyle sliderBg = GUI.skin.horizontalSlider;
+
+        // --- GRAPHICS SECTION ---
+        GUI.Label(new Rect(panelX, startY, panelWidth, 30), "GRAPHICS", labelStyle);
+        startY += 40f;
+
+        // Quality Preset
+        GUI.Label(new Rect(panelX, startY, labelWidth, rowHeight), "Quality:", settingLabel);
+        int newQuality = GUI.SelectionGrid(new Rect(panelX + labelWidth, startY + 10, controlWidth, 30),
+            qualityLevel, qualityOptions, qualityOptions.Length);
+        if (newQuality != qualityLevel)
+        {
+            qualityLevel = newQuality;
+            ApplySettings();
+        }
+        startY += rowHeight;
+
+        // Shadows
+        GUI.Label(new Rect(panelX, startY, labelWidth, rowHeight), "Shadows:", settingLabel);
+        int newShadow = GUI.SelectionGrid(new Rect(panelX + labelWidth, startY + 10, controlWidth, 30),
+            shadowQuality, shadowOptions, shadowOptions.Length);
+        if (newShadow != shadowQuality)
+        {
+            shadowQuality = newShadow;
+            ApplySettings();
+        }
+        startY += rowHeight;
+
+        // Shadow Distance (only show if shadows enabled)
+        if (shadowQuality > 0)
+        {
+            GUI.Label(new Rect(panelX, startY, labelWidth, rowHeight), "Shadow Dist:", settingLabel);
+            float newShadowDist = GUI.HorizontalSlider(new Rect(panelX + labelWidth, startY + 18, controlWidth - 60, 20),
+                shadowDistance, 10f, 100f);
+            GUI.Label(new Rect(panelX + labelWidth + controlWidth - 50, startY, 50, rowHeight),
+                Mathf.RoundToInt(newShadowDist).ToString(), settingLabel);
+            if (Mathf.Abs(newShadowDist - shadowDistance) > 1f)
+            {
+                shadowDistance = newShadowDist;
+                ApplySettings();
+            }
+            startY += rowHeight;
+        }
+
+        // Resolution Scale
+        GUI.Label(new Rect(panelX, startY, labelWidth, rowHeight), "Resolution:", settingLabel);
+        float newResScale = GUI.HorizontalSlider(new Rect(panelX + labelWidth, startY + 18, controlWidth - 60, 20),
+            resolutionScale, 0.5f, 1f);
+        GUI.Label(new Rect(panelX + labelWidth + controlWidth - 50, startY, 50, rowHeight),
+            Mathf.RoundToInt(newResScale * 100) + "%", settingLabel);
+        if (Mathf.Abs(newResScale - resolutionScale) > 0.01f)
+        {
+            resolutionScale = newResScale;
+            ApplySettings();
+        }
+        startY += rowHeight;
+
+        // --- CONTROLS SECTION ---
+        startY += 20f;
+        GUI.Label(new Rect(panelX, startY, panelWidth, 30), "CONTROLS", labelStyle);
+        startY += 40f;
+
+        // Mouse Sensitivity
+        GUI.Label(new Rect(panelX, startY, labelWidth, rowHeight), "Sensitivity:", settingLabel);
+        mouseSensitivity = GUI.HorizontalSlider(new Rect(panelX + labelWidth, startY + 18, controlWidth - 60, 20),
+            mouseSensitivity, 0.5f, 5f);
+        GUI.Label(new Rect(panelX + labelWidth + controlWidth - 50, startY, 50, rowHeight),
+            mouseSensitivity.ToString("F1"), settingLabel);
+        startY += rowHeight;
+
+        // --- BUTTONS ---
+        startY += 30f;
+        float buttonWidth = 140f;
+        float buttonSpacing = 20f;
+        float buttonsX = centerX - (buttonWidth * 2 + buttonSpacing) / 2f;
+
+        if (GUI.Button(new Rect(buttonsX, startY, buttonWidth, 50), "SAVE", buttonStyle))
+        {
+            SaveSettings();
+            currentState = GameState.MainMenu;
+        }
+
+        if (GUI.Button(new Rect(buttonsX + buttonWidth + buttonSpacing, startY, buttonWidth, 50), "BACK", buttonStyle))
+        {
+            LoadSettings(); // Revert unsaved changes
+            ApplySettings();
+            currentState = GameState.MainMenu;
+        }
+
+        // Performance tip
+        startY += 70f;
+        GUIStyle tipStyle = new GUIStyle(smallLabelStyle);
+        tipStyle.wordWrap = true;
+        GUI.Label(new Rect(panelX, startY, panelWidth, 40),
+            "Tip: Lower shadows and resolution for better FPS on slower devices.", tipStyle);
+    }
+
+    void LoadSettings()
+    {
+        shadowQuality = PlayerPrefs.GetInt("ShadowQuality", 1);
+        shadowDistance = PlayerPrefs.GetFloat("ShadowDistance", 40f);
+        qualityLevel = PlayerPrefs.GetInt("QualityLevel", 0);
+        resolutionScale = PlayerPrefs.GetFloat("ResolutionScale", 1f);
+        mouseSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 2f);
+        vSyncEnabled = PlayerPrefs.GetInt("VSync", 0) == 1;
+    }
+
+    void SaveSettings()
+    {
+        PlayerPrefs.SetInt("ShadowQuality", shadowQuality);
+        PlayerPrefs.SetFloat("ShadowDistance", shadowDistance);
+        PlayerPrefs.SetInt("QualityLevel", qualityLevel);
+        PlayerPrefs.SetFloat("ResolutionScale", resolutionScale);
+        PlayerPrefs.SetFloat("MouseSensitivity", mouseSensitivity);
+        PlayerPrefs.SetInt("VSync", vSyncEnabled ? 1 : 0);
+        PlayerPrefs.Save();
+        Debug.Log("Settings saved!");
+    }
+
+    void ApplySettings()
+    {
+        // Apply quality level
+        QualitySettings.SetQualityLevel(qualityLevel, true);
+
+        // Apply shadow settings
+        switch (shadowQuality)
+        {
+            case 0: // Off
+                QualitySettings.shadows = ShadowQuality.Disable;
+                break;
+            case 1: // Low
+                QualitySettings.shadows = ShadowQuality.HardOnly;
+                QualitySettings.shadowResolution = ShadowResolution.Low;
+                break;
+            case 2: // Medium
+                QualitySettings.shadows = ShadowQuality.All;
+                QualitySettings.shadowResolution = ShadowResolution.Medium;
+                break;
+            case 3: // High
+                QualitySettings.shadows = ShadowQuality.All;
+                QualitySettings.shadowResolution = ShadowResolution.High;
+                break;
+        }
+
+        QualitySettings.shadowDistance = shadowDistance;
+
+        // Apply resolution scale (affects render scale)
+        // Note: Full implementation requires render pipeline settings
+        // For now, we can use Screen.SetResolution for basic scaling
+        #if !UNITY_EDITOR
+        int targetWidth = Mathf.RoundToInt(Screen.currentResolution.width * resolutionScale);
+        int targetHeight = Mathf.RoundToInt(Screen.currentResolution.height * resolutionScale);
+        Screen.SetResolution(targetWidth, targetHeight, Screen.fullScreen);
+        #endif
+
+        // VSync (limited in WebGL)
+        QualitySettings.vSyncCount = vSyncEnabled ? 1 : 0;
+
+        Debug.Log($"Applied settings - Quality:{qualityOptions[qualityLevel]}, Shadows:{shadowOptions[shadowQuality]}, Resolution:{resolutionScale*100}%");
     }
 
     void ConnectToServer()

@@ -54,6 +54,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     public float currentHealth;
     public bool isDead = false;
 
+
     // Components
     private CharacterController controller;
     private Animator animator;
@@ -83,6 +84,12 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     private Quaternion networkRotation;
     private float networkMoveSpeed;
 
+    // Network interpolation for smooth remote players
+    private Vector3 networkVelocity;
+    private Vector3 lastNetworkPosition;
+    private float networkLag;
+    private float lastNetworkTime;
+
     private bool isInitialized = false;
 
     // Static reference to ensure only one local player
@@ -90,6 +97,18 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     // Team system
     public Team playerTeam = Team.None;
+
+    // Squad system
+    [Header("Squad System")]
+    public int maxSquadSize = 7;
+    public float recruitRadius = 15f;
+    private System.Collections.Generic.List<AIController> squadMembers = new System.Collections.Generic.List<AIController>();
+    private Transform currentTarget;  // The enemy the player is currently shooting at
+
+    // Squad UI markers
+    private AIController lookedAtSquadMember;
+    private GUIStyle nameTagStyle;
+    private bool uiStylesInitialized = false;
 
     [Header("Team Skins")]
     public string[] phantomSkinNames = { "SM_Chr_Soldier_Male_01", "SM_Chr_Soldier_Male_02", "SM_Chr_Soldier_Female_01" };
@@ -308,6 +327,9 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
         networkPosition = transform.position;
         networkRotation = transform.rotation;
+        lastNetworkPosition = transform.position;
+        lastNetworkTime = Time.time;
+        networkVelocity = Vector3.zero;
 
         isInitialized = true;
     }
@@ -356,6 +378,18 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         // Don't allow any actions while dead
         if (isDead) return;
 
+        // Always handle squad/TAB input first (so TAB works to close the screen)
+        HandleSquad();
+
+        // Check if squad command screen is open
+        SquadCommandScreen cmdScreen = SquadCommandScreen.Instance;
+        bool cmdScreenActive = cmdScreen != null && cmdScreen.IsActive;
+
+        if (cmdScreenActive)
+        {
+            return; // Don't process other player input while commanding
+        }
+
         ReadInput();
         HandleMovement();
         HandleMouseLook();
@@ -364,11 +398,176 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         // Note: PositionWeapon moved to LateUpdate to sync with camera
     }
 
+    void HandleSquad()
+    {
+        var keyboard = Keyboard.current;
+        if (keyboard == null) return;
+
+        // Press G to recruit nearby friendly AI
+        if (keyboard.gKey.wasPressedThisFrame)
+        {
+            RecruitNearbySquad();
+        }
+
+        // Press TAB to toggle squad command screen
+        if (keyboard.tabKey.wasPressedThisFrame)
+        {
+            SquadCommandScreen screen = SquadCommandScreen.Instance;
+
+            Debug.Log($"TAB pressed: squadMembers={squadMembers.Count}, screenExists={screen != null}, screenActive={screen?.IsActive ?? false}");
+
+            if (screen != null && screen.IsActive)
+            {
+                // Close the screen
+                Debug.Log("Closing command screen via TAB in HandleSquad");
+                screen.Hide();
+            }
+            else if (squadMembers.Count > 0)
+            {
+                // Open the screen
+                Debug.Log("Opening command screen");
+                OpenSquadCommandScreen();
+            }
+            else
+            {
+                Debug.Log("No squad members - can't open command screen");
+            }
+        }
+
+        // Clean up dead or null squad members
+        squadMembers.RemoveAll(ai => ai == null || ai.isDead);
+
+        // Clear target if it's dead or destroyed
+        if (currentTarget != null)
+        {
+            AIController targetAI = currentTarget.GetComponent<AIController>();
+            FPSControllerPhoton targetPlayer = currentTarget.GetComponent<FPSControllerPhoton>();
+
+            if ((targetAI != null && targetAI.isDead) || (targetPlayer != null && targetPlayer.isDead))
+            {
+                currentTarget = null;
+            }
+        }
+    }
+
+    void RecruitNearbySquad()
+    {
+        // Find all friendly AI within radius
+        AIController[] allAI = FindObjectsOfType<AIController>();
+
+        int recruited = 0;
+        foreach (AIController ai in allAI)
+        {
+            // Skip if squad is full
+            if (squadMembers.Count >= maxSquadSize) break;
+
+            // Skip if already in squad
+            if (squadMembers.Contains(ai)) continue;
+
+            // Skip if not on our team
+            if (ai.team != playerTeam) continue;
+
+            // Skip if dead
+            if (ai.isDead) continue;
+
+            // Skip if already in another squad
+            if (ai.IsInSquad()) continue;
+
+            // Check distance
+            float dist = Vector3.Distance(transform.position, ai.transform.position);
+            if (dist <= recruitRadius)
+            {
+                ai.JoinSquad(this);
+                squadMembers.Add(ai);
+                recruited++;
+                Debug.Log($"Recruited {ai.gameObject.name} to squad! Squad size: {squadMembers.Count}");
+            }
+        }
+
+        if (recruited > 0)
+        {
+            Debug.Log($"Recruited {recruited} AI to squad. Total: {squadMembers.Count}/{maxSquadSize}");
+        }
+        else if (squadMembers.Count >= maxSquadSize)
+        {
+            Debug.Log("Squad is full!");
+        }
+        else
+        {
+            Debug.Log("No friendly AI nearby to recruit.");
+        }
+    }
+
+    public void DisbandSquad()
+    {
+        foreach (AIController ai in squadMembers)
+        {
+            if (ai != null)
+            {
+                ai.LeaveSquad();
+            }
+        }
+        squadMembers.Clear();
+        Debug.Log("Squad disbanded.");
+    }
+
+    // Property for squad members to get leader's target
+    public Transform GetCurrentTarget()
+    {
+        return currentTarget;
+    }
+
+    public int GetSquadSize()
+    {
+        return squadMembers.Count;
+    }
+
+    public System.Collections.Generic.List<AIController> GetSquadMembers()
+    {
+        return squadMembers;
+    }
+
+    void OpenSquadCommandScreen()
+    {
+        Debug.Log("Opening squad command screen...");
+
+        SquadCommandScreen commandScreen = FindObjectOfType<SquadCommandScreen>();
+        if (commandScreen == null)
+        {
+            Debug.Log("Creating new SquadCommandScreen");
+            GameObject screenObj = new GameObject("SquadCommandScreen");
+            commandScreen = screenObj.AddComponent<SquadCommandScreen>();
+        }
+        else
+        {
+            Debug.Log($"Found existing SquadCommandScreen, isActive={commandScreen.IsActive}");
+        }
+
+        commandScreen.Show(this);
+        Debug.Log($"Called Show(), isActive={commandScreen.IsActive}");
+    }
+
     void UpdateRemotePlayer()
     {
-        // Smoothly interpolate to network position
-        transform.position = Vector3.Lerp(transform.position, networkPosition, Time.deltaTime * 10f);
-        transform.rotation = Quaternion.Lerp(transform.rotation, networkRotation, Time.deltaTime * 10f);
+        // Predict position based on velocity and lag
+        Vector3 predictedPosition = networkPosition + networkVelocity * networkLag;
+
+        // Calculate distance to predicted position
+        float distance = Vector3.Distance(transform.position, predictedPosition);
+
+        // Use faster lerp when further behind (catches up quicker)
+        float lerpSpeed = Mathf.Clamp(distance * 5f, 10f, 30f);
+
+        // Smoothly interpolate to predicted position
+        transform.position = Vector3.Lerp(transform.position, predictedPosition, Time.deltaTime * lerpSpeed);
+        transform.rotation = Quaternion.Slerp(transform.rotation, networkRotation, Time.deltaTime * 15f);
+
+        // Snap if too far behind (teleport threshold)
+        if (distance > 5f)
+        {
+            transform.position = predictedPosition;
+            transform.rotation = networkRotation;
+        }
 
         // Update animator
         if (animator != null)
@@ -382,11 +581,16 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         if (!photonView.IsMine || !isInitialized) return;
         if (isDead) return;
 
-        // Update player rotation
+        // Don't control camera when command screen or spawn screen is active
+        SquadCommandScreen cmdScreen = SquadCommandScreen.Instance;
+        SpawnSelectScreen spawnScreen = SpawnSelectScreen.Instance;
+        bool screenActive = (cmdScreen != null && cmdScreen.IsActive) || (spawnScreen != null && spawnScreen.IsActive);
+
+        // Update player rotation (always do this)
         transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
 
-        // Update camera
-        if (cameraTransform != null)
+        // Update camera (only when no overlay screen is active)
+        if (cameraTransform != null && !screenActive)
         {
             Vector3 targetPosition = transform.position + Vector3.up * cameraHeight;
             cameraTransform.position = targetPosition;
@@ -394,7 +598,16 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
 
         // Position weapon AFTER camera is updated (prevents stutter)
-        PositionWeapon();
+        // Hide weapon when screen is active
+        if (!screenActive)
+        {
+            PositionWeapon();
+        }
+        else if (weaponTransform != null)
+        {
+            // Move weapon off-screen when in command view
+            weaponTransform.position = Vector3.one * 9999f;
+        }
     }
 
     void ReadInput()
@@ -598,6 +811,9 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
                     Debug.Log($"Hit enemy player {hitPlayer.photonView.ViewID} (Team: {hitPlayer.playerTeam})!");
                     // Apply damage via RPC - call on the hit player's photonView
                     hitPlayer.photonView.RPC("RPC_TakeDamage", RpcTarget.All, damage, photonView.ViewID);
+
+                    // Set as current target for squad
+                    currentTarget = hitPlayer.transform;
                 }
             }
 
@@ -611,7 +827,10 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             if (hitAI != null && hitAI.isAIControlled && hitAI.team != playerTeam)
             {
                 Debug.Log($"Hit enemy AI {hitAI.gameObject.name} (Team: {hitAI.team})!");
-                hitAI.TakeDamage(damage, transform.position);
+                hitAI.TakeDamage(damage, transform.position, hit.point);
+
+                // Set as current target for squad
+                currentTarget = hitAI.transform;
             }
 
             // Spawn impact effect if we didn't hit a player or AI
@@ -663,6 +882,9 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         currentHealth -= damage;
         Debug.Log($"Player {photonView.ViewID} took {damage} damage from {attackerViewID}. Health: {currentHealth}/{maxHealth}");
 
+        // Spawn blood hit effect
+        SpawnBloodHit(transform.position + Vector3.up * 1.2f);
+
         if (currentHealth <= 0)
         {
             Die();
@@ -675,6 +897,9 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         isDead = true;
 
         Debug.Log($"Player {photonView.ViewID} died!");
+
+        // Spawn death blood effect
+        SpawnBloodDeath(transform.position + Vector3.up * 0.5f);
 
         // Enable ragdoll physics
         RagdollHelper.EnableRagdoll(gameObject, -transform.forward, 6f);
@@ -691,62 +916,61 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
+    void SpawnBloodHit(Vector3 position)
+    {
+        BloodEffectManager.SpawnBloodHit(position);
+    }
+
+    void SpawnBloodDeath(Vector3 position)
+    {
+        BloodEffectManager.SpawnBloodDeath(position);
+    }
+
     System.Collections.IEnumerator RespawnCoroutine()
     {
-        yield return new WaitForSeconds(5f);
+        // Short delay before showing spawn screen
+        yield return new WaitForSeconds(2f);
+
+        // Clean up ragdoll
+        CleanupRagdoll();
+
+        // Show spawn selection screen
+        SpawnSelectScreen spawnScreen = FindObjectOfType<SpawnSelectScreen>();
+        if (spawnScreen == null)
+        {
+            // Create spawn screen if it doesn't exist
+            GameObject spawnScreenObj = new GameObject("SpawnSelectScreen");
+            spawnScreen = spawnScreenObj.AddComponent<SpawnSelectScreen>();
+        }
+
+        // Wait for player to select spawn
+        bool hasSpawned = false;
+        Vector3 selectedSpawnPos = Vector3.zero;
+        Quaternion selectedSpawnRot = Quaternion.identity;
+
+        spawnScreen.OnSpawnSelected = (pos, rot) =>
+        {
+            selectedSpawnPos = pos;
+            selectedSpawnRot = rot;
+            hasSpawned = true;
+        };
+
+        spawnScreen.Show(this, 5f); // 5 second respawn timer
+
+        // Wait until player selects spawn
+        while (!hasSpawned)
+        {
+            yield return null;
+        }
 
         // Reset health
         currentHealth = maxHealth;
         isDead = false;
 
-        // Clean up ragdoll components
-        CleanupRagdoll();
-
-        // Find spawn point based on team - check both UI managers
-        Vector3 spawnPos = transform.position;
-        Quaternion spawnRot = transform.rotation;
-        Transform spawnPointTransform = null;
-
-        // Try new GameUIManager first
-        GameUIManager gameUI = FindObjectOfType<GameUIManager>();
-        if (gameUI != null)
-        {
-            if (playerTeam == Team.Phantom && gameUI.phantomSpawnPoint != null)
-                spawnPointTransform = gameUI.phantomSpawnPoint;
-            else if (playerTeam == Team.Havoc && gameUI.havocSpawnPoint != null)
-                spawnPointTransform = gameUI.havocSpawnPoint;
-        }
-
-        // Fallback to old PhotonNetworkManager
-        if (spawnPointTransform == null)
-        {
-            PhotonNetworkManager networkManager = FindObjectOfType<PhotonNetworkManager>();
-            if (networkManager != null)
-            {
-                if (playerTeam == Team.Phantom && networkManager.phantomSpawnPoint != null)
-                    spawnPointTransform = networkManager.phantomSpawnPoint;
-                else if (playerTeam == Team.Havoc && networkManager.havocSpawnPoint != null)
-                    spawnPointTransform = networkManager.havocSpawnPoint;
-                else if (networkManager.spawnPoint != null)
-                    spawnPointTransform = networkManager.spawnPoint;
-            }
-        }
-
-        if (spawnPointTransform != null)
-        {
-            spawnPos = spawnPointTransform.position + new Vector3(Random.Range(-2f, 2f), 0, Random.Range(-2f, 2f));
-            spawnRot = spawnPointTransform.rotation;
-            // Rotate Phantom 180 degrees
-            if (playerTeam == Team.Phantom)
-            {
-                spawnRot *= Quaternion.Euler(0, 180f, 0);
-            }
-        }
-
-        // Teleport to spawn
-        transform.position = spawnPos;
-        transform.rotation = spawnRot;
-        rotationY = spawnRot.eulerAngles.y;
+        // Teleport to selected spawn
+        transform.position = selectedSpawnPos;
+        transform.rotation = selectedSpawnRot;
+        rotationY = selectedSpawnRot.eulerAngles.y;
         rotationX = 0f;
 
         // Re-enable CharacterController
@@ -760,14 +984,14 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         {
             animator.enabled = true;
             animator.SetBool("IsDead", false);
-            animator.Play("Idle", 0, 0f); // Reset to idle animation
+            animator.Play("Idle", 0, 0f);
         }
 
         // Lock cursor again
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
-        Debug.Log($"Player {photonView.ViewID} respawned at {spawnPos}");
+        Debug.Log($"Player {photonView.ViewID} respawned at {selectedSpawnPos}");
     }
 
     void CleanupRagdoll()
@@ -898,9 +1122,24 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         else
         {
             // Remote player receives data
-            networkPosition = (Vector3)stream.ReceiveNext();
+            Vector3 newPosition = (Vector3)stream.ReceiveNext();
             networkRotation = (Quaternion)stream.ReceiveNext();
             networkMoveSpeed = (float)stream.ReceiveNext();
+
+            // Calculate velocity from position change
+            float timeSinceLast = Time.time - lastNetworkTime;
+            if (timeSinceLast > 0.001f)
+            {
+                networkVelocity = (newPosition - lastNetworkPosition) / timeSinceLast;
+            }
+
+            // Calculate network lag (time since packet was sent)
+            networkLag = Mathf.Abs((float)(PhotonNetwork.Time - info.SentServerTime));
+
+            // Store for next update
+            lastNetworkPosition = newPosition;
+            networkPosition = newPosition;
+            lastNetworkTime = Time.time;
         }
     }
 
@@ -922,6 +1161,182 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         if (muzzleFlash != null)
         {
             Destroy(muzzleFlash.gameObject);
+        }
+    }
+
+    void InitUIStyles()
+    {
+        if (uiStylesInitialized) return;
+
+        nameTagStyle = new GUIStyle();
+        nameTagStyle.fontSize = 14;
+        nameTagStyle.fontStyle = FontStyle.Bold;
+        nameTagStyle.alignment = TextAnchor.MiddleCenter;
+        nameTagStyle.normal.textColor = Color.white;
+
+        uiStylesInitialized = true;
+    }
+
+    void OnGUI()
+    {
+        // Only draw for local player during gameplay
+        if (!photonView.IsMine || isDead) return;
+        if (playerCamera == null) return;
+
+        // Don't draw when command/spawn screen is active
+        SquadCommandScreen cmdScreen = SquadCommandScreen.Instance;
+        SpawnSelectScreen spawnScreen = SpawnSelectScreen.Instance;
+        if ((cmdScreen != null && cmdScreen.IsActive) || (spawnScreen != null && spawnScreen.IsActive))
+            return;
+
+        InitUIStyles();
+
+        // Check what squad member we're looking at
+        CheckLookingAtSquadMember();
+
+        // Draw markers for squad members (blue dots)
+        foreach (var ai in squadMembers)
+        {
+            if (ai == null || ai.isDead) continue;
+            DrawTeammateMarker(ai.transform, true, ai == lookedAtSquadMember, ai.identity);
+        }
+
+        // Draw markers for other teammates (green dots)
+        DrawOtherTeammateMarkers();
+    }
+
+    void CheckLookingAtSquadMember()
+    {
+        lookedAtSquadMember = null;
+
+        if (cameraTransform == null) return;
+
+        // Raycast from camera forward
+        Ray ray = new Ray(cameraTransform.position, cameraTransform.forward);
+        RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit, 50f))
+        {
+            AIController hitAI = hit.collider.GetComponentInParent<AIController>();
+            if (hitAI != null && squadMembers.Contains(hitAI))
+            {
+                lookedAtSquadMember = hitAI;
+            }
+        }
+
+        // Also check if close to center of screen for any squad member
+        foreach (var ai in squadMembers)
+        {
+            if (ai == null || ai.isDead) continue;
+
+            Vector3 screenPos = playerCamera.WorldToScreenPoint(ai.transform.position + Vector3.up * 2f);
+            if (screenPos.z > 0)
+            {
+                float distFromCenter = Vector2.Distance(
+                    new Vector2(screenPos.x, screenPos.y),
+                    new Vector2(Screen.width / 2f, Screen.height / 2f)
+                );
+
+                if (distFromCenter < 100f)
+                {
+                    float worldDist = Vector3.Distance(transform.position, ai.transform.position);
+                    if (worldDist < 30f)
+                    {
+                        lookedAtSquadMember = ai;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    void DrawTeammateMarker(Transform target, bool isSquadMember, bool showName, SoldierIdentity identity)
+    {
+        Vector3 headPos = target.position + Vector3.up * 2.2f;
+        Vector3 screenPos = playerCamera.WorldToScreenPoint(headPos);
+
+        // Check if on screen and in front
+        if (screenPos.z < 0) return;
+
+        float distance = Vector3.Distance(transform.position, target.position);
+        if (distance > 100f) return;
+
+        // Flip Y for GUI
+        screenPos.y = Screen.height - screenPos.y;
+
+        // Dot size based on distance
+        float dotSize = Mathf.Lerp(12f, 4f, distance / 100f);
+
+        // Draw dot
+        Color dotColor = isSquadMember ? new Color(0.3f, 0.6f, 1f) : new Color(0.3f, 1f, 0.3f);
+        GUI.color = dotColor;
+
+        Rect dotRect = new Rect(screenPos.x - dotSize / 2f, screenPos.y - dotSize / 2f, dotSize, dotSize);
+        GUI.DrawTexture(dotRect, Texture2D.whiteTexture);
+
+        // Draw name if looking at squad member
+        if (showName && identity != null && distance < 30f)
+        {
+            GUI.color = Color.white;
+
+            // Background
+            string nameText = identity.RankAndName;
+            float nameWidth = nameText.Length * 8f + 20f;
+            Rect bgRect = new Rect(screenPos.x - nameWidth / 2f, screenPos.y - dotSize - 25f, nameWidth, 22f);
+            GUI.color = new Color(0, 0, 0, 0.7f);
+            GUI.DrawTexture(bgRect, Texture2D.whiteTexture);
+
+            // Name text
+            GUI.color = new Color(0.3f, 0.7f, 1f);
+            GUI.Label(bgRect, nameText, nameTagStyle);
+
+            // Show order status below
+            if (lookedAtSquadMember != null)
+            {
+                string orderText = GetOrderStatusText(lookedAtSquadMember);
+                Rect orderRect = new Rect(screenPos.x - 60f, screenPos.y + dotSize + 5f, 120f, 18f);
+                GUI.color = new Color(0.7f, 0.7f, 0.7f);
+                GUIStyle orderStyle = new GUIStyle(nameTagStyle) { fontSize = 11 };
+                GUI.Label(orderRect, orderText, orderStyle);
+            }
+        }
+
+        GUI.color = Color.white;
+    }
+
+    string GetOrderStatusText(AIController ai)
+    {
+        switch (ai.currentOrder)
+        {
+            case AIController.OrderType.FollowLeader: return "Following";
+            case AIController.OrderType.DefendPoint: return $"Defending";
+            case AIController.OrderType.CapturePoint: return $"Capturing";
+            case AIController.OrderType.HoldPosition: return "Holding";
+            default: return "";
+        }
+    }
+
+    void DrawOtherTeammateMarkers()
+    {
+        // Draw markers for friendly AI not in squad
+        AIController[] allAI = FindObjectsOfType<AIController>();
+        foreach (var ai in allAI)
+        {
+            if (ai == null || ai.isDead) continue;
+            if (ai.team != playerTeam) continue;
+            if (squadMembers.Contains(ai)) continue; // Skip squad members (already drawn)
+
+            DrawTeammateMarker(ai.transform, false, false, null);
+        }
+
+        // Draw markers for friendly players
+        FPSControllerPhoton[] allPlayers = FindObjectsOfType<FPSControllerPhoton>();
+        foreach (var player in allPlayers)
+        {
+            if (player == null || player == this || player.isDead) continue;
+            if (player.playerTeam != playerTeam) continue;
+
+            DrawTeammateMarker(player.transform, false, false, null);
         }
     }
 }
