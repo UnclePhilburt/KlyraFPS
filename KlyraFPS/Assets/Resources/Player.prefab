@@ -1182,6 +1182,10 @@ MonoBehaviour:
   range: 100
   gunshotSound: {fileID: 8300000, guid: f6300effa65a243168dd09aae4f9a9df, type: 3}
   gunshotVolume: 0.7
+  hitMarkerSound: {fileID: 0}
+  killSound: {fileID: 0}
+  hitMarkerVolume: 0.5
+  killSoundVolume: 0.6
   aimFOV: 30
   normalFOV: 60
   aimSpeed: 10
