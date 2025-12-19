@@ -43,6 +43,13 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     public float gunshotVolume = 0.7f;
     private AudioSource weaponAudio;
 
+    [Header("Hit Feedback Audio")]
+    public AudioClip hitMarkerSound;
+    public AudioClip killSound;
+    public float hitMarkerVolume = 0.5f;
+    public float killSoundVolume = 0.6f;
+    private AudioSource feedbackAudio;
+
     [Header("ADS Settings")]
     public float aimFOV = 30f;
     public float normalFOV = 60f;
@@ -53,7 +60,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     public float maxHealth = 100f;
     public float currentHealth;
     public bool isDead = false;
-
+    private int lastAttackerViewID = -1;
 
     // Components
     private CharacterController controller;
@@ -126,6 +133,17 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         weaponAudio.maxDistance = 50f;
         weaponAudio.rolloffMode = AudioRolloffMode.Linear;
         weaponAudio.playOnAwake = false;
+
+        // Setup feedback audio (hit markers, kill sounds) - 2D for local player only
+        feedbackAudio = gameObject.AddComponent<AudioSource>();
+        feedbackAudio.spatialBlend = 0f; // 2D sound - plays at full volume for local player
+        feedbackAudio.playOnAwake = false;
+
+        // Load hit feedback sounds from Resources if not assigned
+        if (hitMarkerSound == null)
+            hitMarkerSound = Resources.Load<AudioClip>("hitmarker");
+        if (killSound == null)
+            killSound = Resources.Load<AudioClip>("killsound");
 
         // Disable any cameras that came with the prefab FIRST
         // This prevents multiple cameras from being active
@@ -470,6 +488,9 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             // Skip if dead
             if (ai.isDead) continue;
 
+            // Skip if stuck (hasn't moved in a while)
+            if (ai.IsStuck) continue;
+
             // Skip if already in another squad
             if (ai.IsInSquad()) continue;
 
@@ -728,8 +749,14 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         float mouseX = lookInput.x * mouseSensitivity * 0.02f;
         float mouseY = lookInput.y * mouseSensitivity * 0.02f;
 
+        // Check for invert Y setting
+        bool invertY = GameUIManager.InvertY;
+
         rotationY += mouseX;
-        rotationX -= mouseY;
+        if (invertY)
+            rotationX += mouseY;  // Inverted
+        else
+            rotationX -= mouseY;  // Normal
         rotationX = Mathf.Clamp(rotationX, -maxLookAngle, maxLookAngle);
     }
 
@@ -812,6 +839,9 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
                     // Apply damage via RPC - call on the hit player's photonView
                     hitPlayer.photonView.RPC("RPC_TakeDamage", RpcTarget.All, damage, photonView.ViewID);
 
+                    // Play hit marker sound (kill sound will play when kill is confirmed)
+                    PlayHitMarker();
+
                     // Set as current target for squad
                     currentTarget = hitPlayer.transform;
                 }
@@ -827,7 +857,17 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             if (hitAI != null && hitAI.isAIControlled && hitAI.team != playerTeam)
             {
                 Debug.Log($"Hit enemy AI {hitAI.gameObject.name} (Team: {hitAI.team})!");
-                hitAI.TakeDamage(damage, transform.position, hit.point);
+
+                // Check if this will be a kill
+                bool willKill = hitAI.currentHealth - damage <= 0;
+
+                hitAI.TakeDamage(damage, transform.position, hit.point, gameObject);
+
+                // Play appropriate sound
+                if (willKill)
+                    PlayKillSound();
+                else
+                    PlayHitMarker();
 
                 // Set as current target for squad
                 currentTarget = hitAI.transform;
@@ -880,6 +920,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         if (isDead) return;
 
         currentHealth -= damage;
+        lastAttackerViewID = attackerViewID;
         Debug.Log($"Player {photonView.ViewID} took {damage} damage from {attackerViewID}. Health: {currentHealth}/{maxHealth}");
 
         // Spawn blood hit effect
@@ -904,9 +945,42 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         // Enable ragdoll physics
         RagdollHelper.EnableRagdoll(gameObject, -transform.forward, 6f);
 
-        // Disable controls for local player
+        // Report kill to kill feed (only from the victim's client to avoid duplicates)
         if (photonView.IsMine)
         {
+            // Add death to our stats
+            KillFeedManager.AddDeath(PhotonNetwork.LocalPlayer);
+
+            // Find the killer
+            string killerName = "Unknown";
+            Team killerTeam = Team.None;
+
+            if (lastAttackerViewID == -1)
+            {
+                killerName = "AI";
+                killerTeam = playerTeam == Team.Phantom ? Team.Havoc : Team.Phantom;
+            }
+            else
+            {
+                PhotonView attackerView = PhotonView.Find(lastAttackerViewID);
+                if (attackerView != null)
+                {
+                    FPSControllerPhoton attacker = attackerView.GetComponent<FPSControllerPhoton>();
+                    if (attacker != null)
+                    {
+                        killerName = attackerView.Owner.NickName;
+                        killerTeam = attacker.playerTeam;
+
+                        // Add kill to attacker's stats
+                        KillFeedManager.AddKill(attackerView.Owner);
+                    }
+                }
+            }
+
+            // Broadcast kill to all clients
+            photonView.RPC("RPC_BroadcastKill", RpcTarget.All,
+                killerName, PhotonNetwork.LocalPlayer.NickName, (int)killerTeam, (int)playerTeam, false);
+
             // Unlock cursor
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -924,6 +998,65 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     void SpawnBloodDeath(Vector3 position)
     {
         BloodEffectManager.SpawnBloodDeath(position);
+    }
+
+    void PlayHitMarker()
+    {
+        if (!photonView.IsMine) return;
+        if (feedbackAudio != null && hitMarkerSound != null)
+        {
+            feedbackAudio.PlayOneShot(hitMarkerSound, hitMarkerVolume);
+        }
+    }
+
+    void PlayKillSound()
+    {
+        if (!photonView.IsMine) return;
+        if (feedbackAudio != null && killSound != null)
+        {
+            feedbackAudio.PlayOneShot(killSound, killSoundVolume);
+        }
+    }
+
+    [PunRPC]
+    void RPC_BroadcastKill(string killerName, string victimName, int killerTeam, int victimTeam, bool isHeadshot)
+    {
+        // Initialize kill feed manager if needed
+        KillFeedManager.Initialize();
+
+        // Add kill to local kill feed
+        KillFeedManager.AddKillToFeed(killerName, victimName, killerTeam, victimTeam, isHeadshot);
+
+        // Play kill sound for the killer (check if we're the killer)
+        if (killerName == PhotonNetwork.LocalPlayer.NickName)
+        {
+            // Find our local player and play the sound
+            FPSControllerPhoton localPlayer = FindLocalPlayer();
+            if (localPlayer != null)
+            {
+                localPlayer.PlayKillSoundDirect();
+            }
+        }
+    }
+
+    // Called directly to play kill sound without photonView check
+    public void PlayKillSoundDirect()
+    {
+        if (feedbackAudio != null && killSound != null)
+        {
+            feedbackAudio.PlayOneShot(killSound, killSoundVolume);
+        }
+    }
+
+    static FPSControllerPhoton FindLocalPlayer()
+    {
+        FPSControllerPhoton[] players = FindObjectsOfType<FPSControllerPhoton>();
+        foreach (var p in players)
+        {
+            if (p.photonView.IsMine)
+                return p;
+        }
+        return null;
     }
 
     System.Collections.IEnumerator RespawnCoroutine()

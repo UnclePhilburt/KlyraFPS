@@ -51,9 +51,21 @@ public class BloodEffectManager : MonoBehaviour
 
     GameObject FindPrefabByName(string name)
     {
-        // First try Resources
-        GameObject prefab = Resources.Load<GameObject>(name);
-        if (prefab != null) return prefab;
+        // Try Resources with FX subfolder first
+        GameObject prefab = Resources.Load<GameObject>($"FX/{name}");
+        if (prefab != null)
+        {
+            Debug.Log($"Loaded blood prefab from Resources/FX/{name}");
+            return prefab;
+        }
+
+        // Try Resources root
+        prefab = Resources.Load<GameObject>(name);
+        if (prefab != null)
+        {
+            Debug.Log($"Loaded blood prefab from Resources/{name}");
+            return prefab;
+        }
 
         #if UNITY_EDITOR
         // In editor, search the asset database
@@ -66,13 +78,14 @@ public class BloodEffectManager : MonoBehaviour
                 prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 if (prefab != null)
                 {
-                    Debug.Log($"Found blood prefab: {path}");
+                    Debug.Log($"Found blood prefab via AssetDatabase: {path}");
                     return prefab;
                 }
             }
         }
         #endif
 
+        Debug.LogWarning($"BloodEffectManager: Could not find prefab '{name}'");
         return null;
     }
 

@@ -118,6 +118,7 @@ public class AIController : MonoBehaviour
     // Combat smarts
     private Vector3 lastDamageDirection;
     private float lastDamageTime;
+    private GameObject lastAttacker;
     private float strafeDirection = 1f;
     private float strafeTimer = 0f;
     private Transform lastKnownEnemyPos;
@@ -135,6 +136,43 @@ public class AIController : MonoBehaviour
     private float ambushTimer = 0f;
     private int killStreak = 0;
     private float confidence = 0.5f;       // 0 = terrified, 1 = overconfident
+
+    // === ADVANCED AI SYSTEMS ===
+
+    // Cover System
+    private Vector3 currentCoverPosition;
+    private Vector3 coverPeekDirection;
+    private bool isInCover = false;
+    private bool isPeeking = false;
+    private float coverSearchTimer = 0f;
+    private float peekTimer = 0f;
+    private float coverQuality = 0f;       // 0-1, how good is current cover
+    private static string[] coverTags = { "Cover", "Wall", "Obstacle" };
+    private static LayerMask coverLayerMask = -1;  // All layers by default
+
+    // Flanking & Tactics
+    private Vector3 flankTarget;
+    private bool isFlankingTarget = false;
+    private float flankTimer = 0f;
+    private bool enemyIsDistracted = false;  // Enemy focused on someone else
+    private AIController distractingAlly;    // Who is distracting our target
+
+    // Aim System
+    private Vector3 predictedEnemyPos;
+    private Vector3 lastEnemyVelocity;
+    private Vector3 previousEnemyPos;
+    private float aimOffset = 0f;           // Current aim inaccuracy
+    private float aimSettleTimer = 0f;      // Time spent aiming at current target
+    private bool isAimingForHead = false;
+    private float reactionTimer = 0f;       // Delay before reacting to new threat
+
+    // Team Coordination
+    private static Dictionary<Team, List<Vector3>> sharedEnemyPositions = new Dictionary<Team, List<Vector3>>();
+    private static Dictionary<Team, float> lastCoordinatedPush = new Dictionary<Team, float>();
+    private float lastCalloutTime = 0f;
+    private bool isProvidingCoverFire = false;
+    private AIController coveringFor;        // Who we're covering
+    private float coordinationTimer = 0f;
 
     void Start()
     {
@@ -307,6 +345,9 @@ public class AIController : MonoBehaviour
         // Generate soldier identity
         identity = SoldierIdentity.Generate(team);
         gameObject.name = $"AI_{identity.RankAndName}";
+
+        // Register with kill feed manager for scoreboard
+        KillFeedManager.RegisterAI(this);
 
         AssignToSquad();
         FindNextCapturePoint();
@@ -862,6 +903,443 @@ public class AIController : MonoBehaviour
         return false;
     }
 
+    // ============ COVER SYSTEM ============
+
+    // Find nearby cover relative to a threat
+    Vector3 FindCoverPosition(Vector3 threatPos)
+    {
+        Vector3 bestCover = Vector3.zero;
+        float bestScore = -1f;
+
+        // Search for cover in a radius
+        float searchRadius = 15f;
+        Collider[] nearby = Physics.OverlapSphere(transform.position, searchRadius);
+
+        foreach (var col in nearby)
+        {
+            // Skip small objects and triggers
+            if (col.isTrigger) continue;
+            if (col.bounds.size.magnitude < 0.5f) continue;
+
+            // Check if this object can provide cover
+            Vector3 coverPos = GetCoverPointBehindObject(col, threatPos);
+            if (coverPos == Vector3.zero) continue;
+
+            // Score this cover position
+            float score = ScoreCoverPosition(coverPos, threatPos, col);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCover = coverPos;
+            }
+        }
+
+        coverQuality = bestScore;
+        return bestCover;
+    }
+
+    Vector3 GetCoverPointBehindObject(Collider coverObject, Vector3 threatPos)
+    {
+        // Get the direction from threat to cover object
+        Vector3 coverCenter = coverObject.bounds.center;
+        Vector3 dirFromThreat = (coverCenter - threatPos).normalized;
+
+        // Position behind the cover relative to threat
+        Vector3 coverPoint = coverCenter + dirFromThreat * (coverObject.bounds.extents.magnitude + 1f);
+        coverPoint.y = transform.position.y; // Keep at our height
+
+        // Check if position is on NavMesh
+        NavMeshHit navHit;
+        if (NavMesh.SamplePosition(coverPoint, out navHit, 2f, NavMesh.AllAreas))
+        {
+            // Verify we can actually reach it
+            NavMeshPath path = new NavMeshPath();
+            if (NavMesh.CalculatePath(transform.position, navHit.position, NavMesh.AllAreas, path))
+            {
+                if (path.status == NavMeshPathStatus.PathComplete)
+                {
+                    return navHit.position;
+                }
+            }
+        }
+
+        return Vector3.zero;
+    }
+
+    float ScoreCoverPosition(Vector3 coverPos, Vector3 threatPos, Collider coverObject)
+    {
+        float score = 0f;
+
+        // Distance from current position (closer is better, but not too close)
+        float distFromMe = Vector3.Distance(transform.position, coverPos);
+        if (distFromMe < 2f) score -= 0.2f;  // Too close, not worth moving
+        else if (distFromMe < 8f) score += 0.3f;  // Good distance
+        else if (distFromMe < 15f) score += 0.1f;  // Acceptable
+        else return -1f;  // Too far
+
+        // Check if cover actually blocks line of sight to threat
+        Vector3 eyeHeight = coverPos + Vector3.up * 1.5f;
+        if (Physics.Linecast(eyeHeight, threatPos + Vector3.up * 1.5f, out RaycastHit hit))
+        {
+            if (hit.collider == coverObject || Vector3.Distance(hit.point, threatPos) > 2f)
+            {
+                score += 0.5f;  // Good cover!
+            }
+        }
+
+        // Prefer cover that still allows us to shoot (peek potential)
+        Vector3 peekLeft = coverPos + Vector3.Cross(Vector3.up, (threatPos - coverPos).normalized) * 1.5f;
+        Vector3 peekRight = coverPos - Vector3.Cross(Vector3.up, (threatPos - coverPos).normalized) * 1.5f;
+
+        if (!Physics.Linecast(peekLeft + Vector3.up * 1.5f, threatPos + Vector3.up * 1.5f))
+            score += 0.2f;
+        if (!Physics.Linecast(peekRight + Vector3.up * 1.5f, threatPos + Vector3.up * 1.5f))
+            score += 0.2f;
+
+        // Defensive personalities prefer better cover
+        if (personality == Personality.Defensive || personality == Personality.Camper)
+            score *= 1.3f;
+
+        return score;
+    }
+
+    void MoveToCover(Vector3 coverPos, Vector3 threatPos)
+    {
+        currentCoverPosition = coverPos;
+        coverPeekDirection = (threatPos - coverPos).normalized;
+        isInCover = false;  // Will be true when we arrive
+        SetDestination(coverPos);
+    }
+
+    void UpdateCoverBehavior()
+    {
+        if (!isInCover || targetEnemy == null) return;
+
+        peekTimer -= Time.deltaTime;
+
+        if (isPeeking)
+        {
+            // While peeking, shoot at enemy
+            if (peekTimer <= 0f)
+            {
+                // Stop peeking, get back in cover
+                isPeeking = false;
+                peekTimer = Random.Range(1f, 3f) * (personality == Personality.Aggressive ? 0.5f : 1f);
+            }
+        }
+        else
+        {
+            // In cover, wait for good moment to peek
+            if (peekTimer <= 0f && targetEnemy != null)
+            {
+                isPeeking = true;
+                peekTimer = Random.Range(1.5f, 4f);  // How long to peek
+            }
+        }
+    }
+
+    // ============ FLANKING SYSTEM ============
+
+    bool ShouldAttemptFlank()
+    {
+        if (targetEnemy == null) return false;
+        if (personality == Personality.Defensive || personality == Personality.Camper) return false;
+
+        // Check if enemy is focused on someone else
+        AIController targetAI = targetEnemy.GetComponent<AIController>();
+        FPSControllerPhoton targetPlayer = targetEnemy.GetComponent<FPSControllerPhoton>();
+
+        if (targetAI != null && targetAI.targetEnemy != null && targetAI.targetEnemy != transform)
+        {
+            enemyIsDistracted = true;
+            return true;
+        }
+
+        // Check if we have allies engaging the same target
+        if (cachedAIs != null)
+        {
+            foreach (var ally in cachedAIs)
+            {
+                if (ally == null || ally == this || ally.team != team) continue;
+                if (ally.currentState != AIState.Combat) continue;
+
+                if (ally.targetEnemy == targetEnemy)
+                {
+                    distractingAlly = ally;
+                    enemyIsDistracted = true;
+                    return Random.value < 0.4f;  // 40% chance to flank when ally is engaging
+                }
+            }
+        }
+
+        return false;
+    }
+
+    Vector3 CalculateFlankPosition()
+    {
+        if (targetEnemy == null) return Vector3.zero;
+
+        Vector3 enemyPos = targetEnemy.position;
+        Vector3 enemyForward = targetEnemy.forward;
+
+        // Try to get behind or to the side of the enemy
+        float flankAngle = Random.value > 0.5f ? 90f : -90f;  // Left or right
+        if (personality == Personality.Aggressive)
+            flankAngle = Random.Range(120f, 180f) * (Random.value > 0.5f ? 1f : -1f);  // More aggressive = try to get behind
+
+        Vector3 flankDir = Quaternion.Euler(0, flankAngle, 0) * enemyForward;
+        Vector3 flankPos = enemyPos + flankDir * Random.Range(8f, 15f);
+
+        // Validate position is on NavMesh
+        NavMeshHit navHit;
+        if (NavMesh.SamplePosition(flankPos, out navHit, 5f, NavMesh.AllAreas))
+        {
+            // Check we can path there
+            NavMeshPath path = new NavMeshPath();
+            if (NavMesh.CalculatePath(transform.position, navHit.position, NavMesh.AllAreas, path))
+            {
+                if (path.status == NavMeshPathStatus.PathComplete)
+                {
+                    return navHit.position;
+                }
+            }
+        }
+
+        return Vector3.zero;
+    }
+
+    void ExecuteFlank()
+    {
+        if (flankTarget == Vector3.zero || targetEnemy == null)
+        {
+            isFlankingTarget = false;
+            return;
+        }
+
+        float distToFlankPos = Vector3.Distance(transform.position, flankTarget);
+
+        if (distToFlankPos < 3f)
+        {
+            // Reached flank position - attack!
+            isFlankingTarget = false;
+            currentState = AIState.Combat;
+        }
+        else
+        {
+            // Keep moving to flank position
+            SetDestination(flankTarget);
+        }
+    }
+
+    // ============ AIM PREDICTION SYSTEM ============
+
+    Vector3 PredictEnemyPosition(float predictionTime = 0.2f)
+    {
+        if (targetEnemy == null) return Vector3.zero;
+
+        Vector3 currentPos = targetEnemy.position;
+
+        // Calculate enemy velocity
+        if (previousEnemyPos != Vector3.zero)
+        {
+            lastEnemyVelocity = (currentPos - previousEnemyPos) / Time.deltaTime;
+        }
+        previousEnemyPos = currentPos;
+
+        // Predict where enemy will be
+        Vector3 predicted = currentPos + lastEnemyVelocity * predictionTime;
+
+        // Add skill-based inaccuracy
+        float skillFactor = accuracy * (1f - aimOffset);
+        predicted = Vector3.Lerp(currentPos, predicted, skillFactor);
+
+        return predicted;
+    }
+
+    Vector3 GetAimPoint()
+    {
+        if (targetEnemy == null) return transform.position + transform.forward * 10f;
+
+        // Base aim point with prediction
+        Vector3 baseAim = PredictEnemyPosition(0.15f);
+
+        // Aim for head if confident and skilled
+        float headChance = accuracy * confidence * 0.5f;
+        if (personality == Personality.Aggressive) headChance *= 1.2f;
+
+        if (Random.value < headChance)
+        {
+            isAimingForHead = true;
+            baseAim += Vector3.up * 1.6f;  // Head height
+        }
+        else
+        {
+            isAimingForHead = false;
+            baseAim += Vector3.up * 1.0f;  // Center mass
+        }
+
+        // Add accuracy-based spread
+        float spread = (1f - accuracy) * 2f;
+        spread *= Mathf.Lerp(1.5f, 0.5f, aimSettleTimer / 2f);  // More accurate when aiming longer
+
+        // More spread when moving or suppressed
+        if (agent != null && agent.velocity.magnitude > 1f) spread *= 1.5f;
+        if (suppressedTimer > 0f) spread *= 2f;
+
+        baseAim += new Vector3(
+            Random.Range(-spread, spread),
+            Random.Range(-spread * 0.5f, spread * 0.5f),
+            Random.Range(-spread, spread)
+        );
+
+        return baseAim;
+    }
+
+    void UpdateAimTracking()
+    {
+        if (targetEnemy != null)
+        {
+            aimSettleTimer += Time.deltaTime;
+            aimSettleTimer = Mathf.Min(aimSettleTimer, 3f);
+
+            // Decrease aim offset over time (getting more accurate)
+            aimOffset = Mathf.Lerp(aimOffset, 0f, Time.deltaTime * 0.5f);
+        }
+        else
+        {
+            aimSettleTimer = 0f;
+            aimOffset = 0.3f;  // Reset inaccuracy when changing targets
+        }
+    }
+
+    // ============ TEAM COORDINATION SYSTEM ============
+
+    void CalloutEnemyPosition(Vector3 enemyPos)
+    {
+        if (Time.time - lastCalloutTime < 3f) return;  // Don't spam callouts
+        lastCalloutTime = Time.time;
+
+        // Share enemy position with team
+        if (!sharedEnemyPositions.ContainsKey(team))
+            sharedEnemyPositions[team] = new List<Vector3>();
+
+        // Remove old positions
+        sharedEnemyPositions[team].RemoveAll(p => Vector3.Distance(p, enemyPos) < 10f);
+        sharedEnemyPositions[team].Add(enemyPos);
+
+        // Limit list size
+        while (sharedEnemyPositions[team].Count > 10)
+            sharedEnemyPositions[team].RemoveAt(0);
+    }
+
+    Vector3 GetSharedEnemyPosition()
+    {
+        if (!sharedEnemyPositions.ContainsKey(team)) return Vector3.zero;
+        if (sharedEnemyPositions[team].Count == 0) return Vector3.zero;
+
+        // Find closest shared enemy position
+        Vector3 closest = Vector3.zero;
+        float closestDist = float.MaxValue;
+
+        foreach (var pos in sharedEnemyPositions[team])
+        {
+            float dist = Vector3.Distance(transform.position, pos);
+            if (dist < closestDist)
+            {
+                closestDist = dist;
+                closest = pos;
+            }
+        }
+
+        return closest;
+    }
+
+    bool ShouldProvideCoverFire()
+    {
+        if (personality == Personality.LoneWolf) return false;
+        if (currentHealth < maxHealth * 0.3f) return false;
+
+        // Check if any ally is moving towards enemy
+        if (cachedAIs == null) return false;
+
+        foreach (var ally in cachedAIs)
+        {
+            if (ally == null || ally == this || ally.team != team) continue;
+            if (ally.currentState != AIState.MovingToPoint && ally.currentState != AIState.Combat) continue;
+
+            // Is ally pushing towards an enemy we can see?
+            if (targetEnemy != null && ally.targetEnemy == targetEnemy)
+            {
+                float allyDistToEnemy = Vector3.Distance(ally.transform.position, targetEnemy.position);
+                float myDistToEnemy = Vector3.Distance(transform.position, targetEnemy.position);
+
+                // If ally is closer and pushing, provide cover
+                if (allyDistToEnemy < myDistToEnemy)
+                {
+                    coveringFor = ally;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    void ProvideCoverFire()
+    {
+        if (targetEnemy == null || coveringFor == null) return;
+
+        // Shoot more aggressively to suppress enemy
+        if (Time.time >= nextFireTime && reloadTimer <= 0f)
+        {
+            Vector3 suppressionPoint = targetEnemy.position + Random.insideUnitSphere * 2f;
+            suppressionPoint.y = targetEnemy.position.y + 1f;
+
+            // Face the enemy
+            Vector3 lookDir = (suppressionPoint - transform.position).normalized;
+            lookDir.y = 0;
+            transform.rotation = Quaternion.LookRotation(lookDir);
+
+            Shoot();
+            nextFireTime = Time.time + fireRate * 0.7f;  // Faster fire rate for suppression
+        }
+    }
+
+    bool TryCoordinatedPush()
+    {
+        if (personality == Personality.LoneWolf || personality == Personality.Camper) return false;
+        if (!lastCoordinatedPush.ContainsKey(team))
+            lastCoordinatedPush[team] = 0f;
+
+        if (Time.time - lastCoordinatedPush[team] < 10f) return false;  // Cooldown
+
+        // Count nearby ready allies
+        int readyAllies = 0;
+        if (cachedAIs != null)
+        {
+            foreach (var ally in cachedAIs)
+            {
+                if (ally == null || ally == this || ally.team != team) continue;
+                if (ally.currentState == AIState.Dead) continue;
+
+                float dist = Vector3.Distance(transform.position, ally.transform.position);
+                if (dist < 20f && ally.currentHealth > ally.maxHealth * 0.5f)
+                {
+                    readyAllies++;
+                }
+            }
+        }
+
+        // Need at least 2 allies to coordinate push
+        if (readyAllies >= 2)
+        {
+            lastCoordinatedPush[team] = Time.time;
+            return true;
+        }
+
+        return false;
+    }
+
     // Update confidence based on events
     void UpdateConfidence(float delta)
     {
@@ -985,6 +1463,16 @@ public class AIController : MonoBehaviour
             if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
             {
                 UpdateAnimation(false);
+
+                // Check if we arrived at cover position
+                if (currentCoverPosition != Vector3.zero &&
+                    Vector3.Distance(transform.position, currentCoverPosition) < 2f)
+                {
+                    isInCover = true;
+                    isPeeking = false;
+                    peekTimer = Random.Range(0.5f, 1.5f);  // Wait before first peek
+                    StopAgent();
+                }
             }
         }
         else
@@ -1339,31 +1827,79 @@ public class AIController : MonoBehaviour
     {
         if (targetEnemy == null) return;
 
-        // Disable NavMeshAgent during combat for manual strafing control
-        if (agentEnabled)
-        {
-            StopAgent();
-        }
+        // Update aim tracking system
+        UpdateAimTracking();
 
         // Decrement timers every frame
         suppressedTimer -= Time.deltaTime;
         strafeTimer -= Time.deltaTime;
         reloadTimer -= Time.deltaTime;
+        coverSearchTimer -= Time.deltaTime;
+        flankTimer -= Time.deltaTime;
 
         float enemyDist = Vector3.Distance(transform.position, targetEnemy.position);
         float healthPercent = currentHealth / maxHealth;
 
-        // === FACING - every frame for smooth aiming ===
-        Vector3 lookDir = (targetEnemy.position - transform.position).normalized;
+        // === COVER BEHAVIOR ===
+        if (isInCover)
+        {
+            UpdateCoverBehavior();
+            if (!isPeeking)
+            {
+                UpdateAnimation(false);
+                return;  // Stay in cover, don't move or shoot
+            }
+        }
+
+        // === FLANKING BEHAVIOR ===
+        if (isFlankingTarget)
+        {
+            ExecuteFlank();
+            // While flanking, don't engage directly - stay quiet
+            if (enemyDist > attackRange * 0.5f)
+            {
+                // Face movement direction, not enemy
+                if (agent != null && agent.velocity.magnitude > 0.5f)
+                {
+                    Vector3 moveDir = agent.velocity.normalized;
+                    moveDir.y = 0;
+                    if (moveDir != Vector3.zero)
+                        transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(moveDir), rotationSpeed * Time.deltaTime);
+                }
+                UpdateAnimation(true);
+                return;
+            }
+            // Close enough to attack from flank!
+            isFlankingTarget = false;
+        }
+
+        // === COVER FIRE BEHAVIOR ===
+        if (isProvidingCoverFire && coveringFor != null)
+        {
+            ProvideCoverFire();
+            UpdateAnimation(false);
+            return;
+        }
+
+        // Disable NavMeshAgent during direct combat for manual strafing
+        if (agentEnabled && !isFlankingTarget)
+        {
+            StopAgent();
+        }
+
+        // === FACING with PREDICTION ===
+        Vector3 aimPoint = GetAimPoint();
+        Vector3 lookDir = (aimPoint - transform.position).normalized;
         lookDir.y = 0;
         if (lookDir != Vector3.zero)
         {
             Quaternion targetRot = Quaternion.LookRotation(lookDir);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * 2f * Time.deltaTime);
+            float aimSpeed = rotationSpeed * 2f * (1f + aimSettleTimer * 0.5f);  // Faster when settled
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, aimSpeed * Time.deltaTime);
         }
 
         // === TACTICAL MOVEMENT ===
-        Vector3 moveDir = Vector3.zero;
+        Vector3 moveDirection = Vector3.zero;
         bool isMoving = false;
 
         // Strafe during combat (change direction periodically)
@@ -1379,15 +1915,28 @@ public class AIController : MonoBehaviour
         // Different behavior based on situation
         if (suppressedTimer > 0f)
         {
-            // Being shot at - take cover or retreat
+            // Being shot at - seek cover or retreat
+            if (healthPercent < 0.5f && coverSearchTimer <= 0f)
+            {
+                // Low health + suppressed = find cover NOW
+                Vector3 coverPos = FindCoverPosition(targetEnemy.position);
+                if (coverPos != Vector3.zero)
+                {
+                    MoveToCover(coverPos, targetEnemy.position);
+                    coverSearchTimer = 3f;
+                    return;
+                }
+            }
+
+            // No cover found, retreat while strafing
             if (healthPercent < 0.5f)
             {
-                moveDir = -transform.forward * 0.5f + transform.right * strafeDirection * 0.5f;
+                moveDirection = -transform.forward * 0.5f + transform.right * strafeDirection * 0.5f;
                 isMoving = true;
             }
             else
             {
-                moveDir = transform.right * strafeDirection;
+                moveDirection = transform.right * strafeDirection;
                 isMoving = true;
             }
         }
@@ -1396,40 +1945,42 @@ public class AIController : MonoBehaviour
             // Too far - advance or hold
             if (personality == Personality.Aggressive || (healthPercent > 0.7f && bravery > 0.5f))
             {
-                moveDir = transform.forward * 0.7f + transform.right * strafeDirection * 0.3f;
+                moveDirection = transform.forward * 0.7f + transform.right * strafeDirection * 0.3f;
                 isMoving = true;
             }
             else
             {
-                moveDir = transform.right * strafeDirection * 0.5f;
+                moveDirection = transform.right * strafeDirection * 0.5f;
                 isMoving = true;
             }
         }
         else if (enemyDist < attackRange * 0.3f)
         {
+            // Too close - back off unless aggressive
             if (personality != Personality.Aggressive)
             {
-                moveDir = -transform.forward * 0.5f + transform.right * strafeDirection * 0.5f;
+                moveDirection = -transform.forward * 0.5f + transform.right * strafeDirection * 0.5f;
                 isMoving = true;
             }
         }
         else
         {
-            moveDir = transform.right * strafeDirection * 0.7f;
+            // Good range - strafe and shoot
+            moveDirection = transform.right * strafeDirection * 0.7f;
             isMoving = Random.value > 0.3f;
         }
 
         // Apply movement
-        if (isMoving && moveDir != Vector3.zero)
+        if (isMoving && moveDirection != Vector3.zero)
         {
-            Vector3 newPos = transform.position + moveDir.normalized * moveSpeed * 0.6f * Time.deltaTime;
+            Vector3 newPos = transform.position + moveDirection.normalized * moveSpeed * 0.6f * Time.deltaTime;
 
             // Check for obstacles at multiple heights (catches poles)
             bool blocked = false;
             float[] heights = { 0.3f, 0.8f, 1.3f };
             foreach (float h in heights)
             {
-                if (Physics.SphereCast(transform.position + Vector3.up * h, 0.25f, moveDir.normalized, out _, 1f))
+                if (Physics.SphereCast(transform.position + Vector3.up * h, 0.25f, moveDirection.normalized, out _, 1f))
                 {
                     blocked = true;
                     break;
@@ -1452,7 +2003,6 @@ public class AIController : MonoBehaviour
                     {
                         transform.position = groundHit.point;
                     }
-                    // else don't move - no valid ground
                 }
             }
             else
@@ -1466,35 +2016,30 @@ public class AIController : MonoBehaviour
             UpdateAnimation(false);
         }
 
-        // === SHOOTING ===
+        // === SHOOTING with PREDICTION ===
         if (burstCount >= 8)
         {
             burstCount = 0;
             reloadTimer = Random.Range(1.5f, 2.5f);
         }
 
-        float facingAngle = Vector3.Angle(transform.forward, lookDir);
+        Vector3 toEnemy = (targetEnemy.position - transform.position).normalized;
+        float facingAngle = Vector3.Angle(transform.forward, toEnemy);
 
         if (reloadTimer <= 0f && enemyDist <= attackRange && Time.time >= nextFireTime)
         {
-            if (facingAngle < 45f) // Increased from 30 to 45 degrees
+            // More accurate when aiming longer and settled
+            float effectiveAccuracy = accuracy * (0.7f + aimSettleTimer * 0.15f);
+            float angleThreshold = Mathf.Lerp(50f, 25f, effectiveAccuracy);
+
+            if (facingAngle < angleThreshold)
             {
-                Shoot();
+                ShootAtPoint(aimPoint);
                 nextFireTime = Time.time + fireRate * Random.Range(0.8f, 1.2f);
+
+                // Reset aim settle on shot (recoil)
+                aimSettleTimer *= 0.7f;
             }
-        }
-
-        // Debug: log why we're not shooting (only occasionally)
-        if (Random.value < 0.01f)
-        {
-            string reason = "";
-            if (reloadTimer > 0f) reason = $"reloading ({reloadTimer:F1}s)";
-            else if (enemyDist > attackRange) reason = $"too far ({enemyDist:F1}m > {attackRange}m)";
-            else if (Time.time < nextFireTime) reason = $"fire cooldown";
-            else if (facingAngle >= 45f) reason = $"not facing ({facingAngle:F0}°)";
-            else reason = "SHOOTING";
-
-            Debug.Log($"{gameObject.name} combat: target={targetEnemy?.name}, dist={enemyDist:F1}m, facing={facingAngle:F0}°, {reason}");
         }
     }
 
@@ -1580,16 +2125,104 @@ public class AIController : MonoBehaviour
             }
         }
 
+        // === ADVANCED TACTICS DECISIONS ===
+
+        // Check if we should seek cover (defensive/low health)
+        if (healthPercent < 0.6f && !isInCover && coverSearchTimer <= 0f)
+        {
+            if (personality == Personality.Defensive || personality == Personality.Camper || healthPercent < 0.4f)
+            {
+                Vector3 coverPos = FindCoverPosition(targetEnemy.position);
+                if (coverPos != Vector3.zero)
+                {
+                    MoveToCover(coverPos, targetEnemy.position);
+                    coverSearchTimer = 5f;
+                    return;
+                }
+            }
+            coverSearchTimer = 2f;  // Don't search again immediately
+        }
+
+        // Check if we should attempt a flank
+        if (!isFlankingTarget && flankTimer <= 0f && healthPercent > 0.5f)
+        {
+            if (ShouldAttemptFlank())
+            {
+                flankTarget = CalculateFlankPosition();
+                if (flankTarget != Vector3.zero)
+                {
+                    isFlankingTarget = true;
+                    flankTimer = 10f;  // Don't try another flank for a while
+                    SetDestination(flankTarget);
+                    Debug.Log($"{gameObject.name} attempting to flank {targetEnemy.name}!");
+                    return;
+                }
+            }
+            flankTimer = 3f;  // Don't check again immediately
+        }
+
+        // Check if we should provide cover fire for an ally pushing
+        if (!isProvidingCoverFire && healthPercent > 0.4f)
+        {
+            if (ShouldProvideCoverFire())
+            {
+                isProvidingCoverFire = true;
+                Debug.Log($"{gameObject.name} providing cover fire for {coveringFor?.gameObject.name}!");
+            }
+        }
+        else if (isProvidingCoverFire)
+        {
+            // Stop covering if ally is no longer pushing or dead
+            if (coveringFor == null || coveringFor.currentState == AIState.Dead ||
+                coveringFor.currentState == AIState.Idle)
+            {
+                isProvidingCoverFire = false;
+                coveringFor = null;
+            }
+        }
+
+        // Check for coordinated push opportunity
+        if (squadRole == SquadRole.Leader && TryCoordinatedPush())
+        {
+            // Signal squad to push together
+            foreach (var member in squadMembers)
+            {
+                if (member != null && member.currentState != AIState.Dead)
+                {
+                    member.confidence = Mathf.Min(member.confidence + 0.2f, 1f);
+                }
+            }
+            confidence = Mathf.Min(confidence + 0.2f, 1f);
+            Debug.Log($"{gameObject.name} initiating coordinated push!");
+        }
+
+        // Check for shared enemy intel if we have no target
+        if (targetEnemy == null)
+        {
+            Vector3 sharedPos = GetSharedEnemyPosition();
+            if (sharedPos != Vector3.zero && Vector3.Distance(transform.position, sharedPos) < detectionRange)
+            {
+                SetDestination(sharedPos);
+                currentState = AIState.MovingToPoint;
+                return;
+            }
+        }
+
         // If enemy too far, go back to objective
         float effectiveRange = detectionRange * (0.7f + patience * 0.3f);
         if (enemyDist > effectiveRange)
         {
             targetEnemy = null;
             currentState = AIState.MovingToPoint;
+            isFlankingTarget = false;
+            isProvidingCoverFire = false;
             if (targetPoint != null)
                 SetDestination(targetPoint.transform.position);
             return;
         }
+
+        // Reset flags if target changed
+        enemyIsDistracted = false;
     }
 
     void FindNearestEnemy()
@@ -1757,18 +2390,19 @@ public class AIController : MonoBehaviour
     void Shoot()
     {
         if (targetEnemy == null) return;
+        ShootAtPoint(targetEnemy.position + Vector3.up * 1f);
+    }
+
+    // Shoot at a specific predicted/calculated aim point
+    void ShootAtPoint(Vector3 aimPoint)
+    {
+        if (targetEnemy == null) return;
 
         // Muzzle position (approximate - in front of character)
         Vector3 muzzlePos = transform.position + Vector3.up * 1.2f + transform.forward * 0.5f;
 
-        // Target position with some spread based on accuracy
-        Vector3 targetPos = targetEnemy.position + Vector3.up * 1f;
-        float spread = (1f - accuracy) * 2f;
-        targetPos += new Vector3(
-            Random.Range(-spread, spread),
-            Random.Range(-spread * 0.5f, spread * 0.5f),
-            Random.Range(-spread, spread)
-        );
+        // The aim point already has prediction and spread calculated by GetAimPoint()
+        Vector3 targetPos = aimPoint;
 
         float dist = Vector3.Distance(transform.position, targetEnemy.position);
 
@@ -1785,37 +2419,69 @@ public class AIController : MonoBehaviour
             StartCoroutine(ShowTracer(muzzlePos, targetPos));
         }
 
-        // Simple hit chance based on distance
-        float hitChance = accuracy * (1f - (dist / attackRange) * 0.5f);
-        bool didHit = Random.value < hitChance;
+        // Calculate hit chance based on multiple factors
+        float baseHitChance = accuracy;
+
+        // Distance penalty
+        baseHitChance *= (1f - (dist / attackRange) * 0.4f);
+
+        // Bonus for longer aim time (settled aim)
+        baseHitChance *= (0.8f + aimSettleTimer * 0.1f);
+
+        // Penalty when suppressed
+        if (suppressedTimer > 0f) baseHitChance *= 0.6f;
+
+        // Penalty when target is moving fast
+        if (lastEnemyVelocity.magnitude > 3f) baseHitChance *= 0.8f;
+
+        // Bonus for flanking (enemy not facing us)
+        if (enemyIsDistracted) baseHitChance *= 1.3f;
+
+        // Headshot bonus damage calculation
+        float damageMultiplier = 1f;
+        if (isAimingForHead && Random.value < baseHitChance * 0.7f)
+        {
+            damageMultiplier = 2f;  // Headshot!
+        }
+
+        bool didHit = Random.value < baseHitChance;
 
         if (didHit)
         {
+            float finalDamage = damage * damageMultiplier;
+
             // Check if target is player
             FPSControllerPhoton player = targetEnemy.GetComponent<FPSControllerPhoton>();
             if (player != null && player.playerTeam != team)
             {
                 // Apply damage to player
-                player.TakeDamageFromAI(damage, transform.position);
-                Debug.Log($"{gameObject.name} hit player {player.photonView.ViewID} for {damage} damage!");
+                player.TakeDamageFromAI(finalDamage, transform.position);
+                if (damageMultiplier > 1f)
+                    Debug.Log($"{gameObject.name} HEADSHOT on player for {finalDamage} damage!");
             }
 
             // Check if target is AI
             AIController ai = targetEnemy.GetComponent<AIController>();
             if (ai != null && ai.team != team)
             {
-                ai.TakeDamage(damage, transform.position, targetPos);
+                ai.TakeDamage(finalDamage, transform.position, targetPos, gameObject);
 
                 // Check if we killed them
                 if (ai.currentHealth <= 0)
                 {
                     killStreak++;
                     UpdateConfidence(0.15f);
+
+                    // Share kill with team
+                    CalloutEnemyPosition(ai.transform.position);
                 }
             }
         }
 
         burstCount++;
+
+        // Call out enemy position when shooting
+        CalloutEnemyPosition(targetEnemy.position);
     }
 
     System.Collections.IEnumerator ShowTracer(Vector3 start, Vector3 end)
@@ -1829,11 +2495,12 @@ public class AIController : MonoBehaviour
         tracerLine.enabled = false;
     }
 
-    public void TakeDamage(float amount, Vector3 damageSource = default, Vector3 hitPoint = default)
+    public void TakeDamage(float amount, Vector3 damageSource = default, Vector3 hitPoint = default, GameObject attacker = null)
     {
         currentHealth -= amount;
         lastDamageTime = Time.time;
         suppressedTimer = 1f; // Suppressed for 1 second
+        if (attacker != null) lastAttacker = attacker;
 
         // Spawn blood effect at hit point
         SpawnBloodHit(hitPoint != default ? hitPoint : transform.position + Vector3.up, damageSource);
@@ -1883,6 +2550,9 @@ public class AIController : MonoBehaviour
         // Spawn death blood effect
         SpawnBloodDeath(transform.position + Vector3.up * 0.5f);
 
+        // Report kill to kill feed
+        ReportDeath();
+
         // Leave player squad if in one
         if (inPlayerSquad)
         {
@@ -1896,8 +2566,62 @@ public class AIController : MonoBehaviour
         Destroy(gameObject, 8f);
     }
 
+    void ReportDeath()
+    {
+        // Track death for scoreboard
+        KillFeedManager.AddAIDeath(this);
+
+        // Get victim name
+        string victimName = identity != null ? identity.RankAndName : gameObject.name;
+        Team victimTeam = team;
+
+        // Determine killer
+        string killerName = "Unknown";
+        Team killerTeam = team == Team.Phantom ? Team.Havoc : Team.Phantom;
+
+        if (lastAttacker != null)
+        {
+            // Check if killed by player
+            FPSControllerPhoton player = lastAttacker.GetComponent<FPSControllerPhoton>();
+            if (player != null)
+            {
+                killerName = player.photonView.Owner.NickName;
+                killerTeam = player.playerTeam;
+
+                // Add kill to player's stats
+                if (player.photonView.IsMine)
+                {
+                    KillFeedManager.AddKill(Photon.Pun.PhotonNetwork.LocalPlayer);
+                }
+            }
+            else
+            {
+                // Killed by another AI
+                AIController killerAI = lastAttacker.GetComponent<AIController>();
+                if (killerAI != null && killerAI.identity != null)
+                {
+                    killerName = killerAI.identity.RankAndName;
+                    killerTeam = killerAI.team;
+
+                    // Add kill to killer AI's stats
+                    KillFeedManager.AddAIKill(killerAI);
+                }
+            }
+        }
+
+        // Report to kill feed
+        KillFeedManager killFeed = FindObjectOfType<KillFeedManager>();
+        if (killFeed != null)
+        {
+            killFeed.ReportKill(killerName, victimName, killerTeam, victimTeam);
+        }
+    }
+
     // Property to check if dead
     public bool isDead => currentState == AIState.Dead;
+
+    // Property to check if stuck (hasn't moved in a while)
+    public bool IsStuck => stuckTimer > 2f || stuckAttempts > 1;
 
     // Player-led squad methods
     public bool IsInSquad()
@@ -2282,7 +3006,7 @@ public class AIController : MonoBehaviour
             AIController hitAI = hit.collider.GetComponentInParent<AIController>();
             if (hitAI != null && hitAI.team != team)
             {
-                hitAI.TakeDamage(damage, transform.position, hit.point);
+                hitAI.TakeDamage(damage, transform.position, hit.point, gameObject);
             }
         }
         else

@@ -991,50 +991,13 @@ public class SquadCommandScreen : MonoBehaviour
 
     void DrawFilledCircle(Vector2 center, float radius, int segments)
     {
-        // Draw filled circle using triangles from center
-        for (int i = 0; i < segments; i++)
+        // Simple filled circle using concentric rectangles (much more efficient)
+        // This avoids the massive memory allocations of the triangle approach
+        float step = Mathf.Max(1f, radius / 8f);
+        for (float r = radius; r > 0; r -= step)
         {
-            float angle1 = (float)i / segments * Mathf.PI * 2;
-            float angle2 = (float)(i + 1) / segments * Mathf.PI * 2;
-
-            Vector2 p1 = center + new Vector2(Mathf.Cos(angle1), Mathf.Sin(angle1)) * radius;
-            Vector2 p2 = center + new Vector2(Mathf.Cos(angle2), Mathf.Sin(angle2)) * radius;
-
-            // Draw triangle from center to edge
-            DrawTriangle(center, p1, p2);
-        }
-    }
-
-    void DrawTriangle(Vector2 p1, Vector2 p2, Vector2 p3)
-    {
-        // Simple triangle drawing using lines (approximation)
-        float minY = Mathf.Min(p1.y, Mathf.Min(p2.y, p3.y));
-        float maxY = Mathf.Max(p1.y, Mathf.Max(p2.y, p3.y));
-
-        for (float y = minY; y <= maxY; y += 1f)
-        {
-            // Find intersections with triangle edges at this y
-            List<float> intersections = new List<float>();
-
-            CheckEdgeIntersection(p1, p2, y, intersections);
-            CheckEdgeIntersection(p2, p3, y, intersections);
-            CheckEdgeIntersection(p3, p1, y, intersections);
-
-            if (intersections.Count >= 2)
-            {
-                intersections.Sort();
-                GUI.DrawTexture(new Rect(intersections[0], y, intersections[intersections.Count - 1] - intersections[0], 1), whiteTex);
-            }
-        }
-    }
-
-    void CheckEdgeIntersection(Vector2 a, Vector2 b, float y, List<float> intersections)
-    {
-        if ((a.y <= y && b.y > y) || (b.y <= y && a.y > y))
-        {
-            float t = (y - a.y) / (b.y - a.y);
-            float x = a.x + t * (b.x - a.x);
-            intersections.Add(x);
+            float size = r * 2f;
+            GUI.DrawTexture(new Rect(center.x - r, center.y - r, size, size), whiteTex);
         }
     }
 
@@ -1366,11 +1329,17 @@ public class SquadCommandScreen : MonoBehaviour
         minX -= padding; maxX += padding;
         minZ -= padding; maxZ += padding;
 
+        // Prevent division by zero
+        float rangeX = maxX - minX;
+        float rangeZ = maxZ - minZ;
+        if (rangeX < 1f) rangeX = 1f;
+        if (rangeZ < 1f) rangeZ = 1f;
+
         // Draw points on minimap
         foreach (var point in allPoints)
         {
-            float nx = (point.transform.position.x - minX) / (maxX - minX);
-            float ny = (point.transform.position.z - minZ) / (maxZ - minZ);
+            float nx = (point.transform.position.x - minX) / rangeX;
+            float ny = (point.transform.position.z - minZ) / rangeZ;
 
             float px = mapRect.x + nx * mapRect.width;
             float py = mapRect.y + (1 - ny) * mapRect.height;
@@ -1385,8 +1354,8 @@ public class SquadCommandScreen : MonoBehaviour
         {
             if (unit == null) continue;
 
-            float nx = (unit.transform.position.x - minX) / (maxX - minX);
-            float ny = (unit.transform.position.z - minZ) / (maxZ - minZ);
+            float nx = (unit.transform.position.x - minX) / rangeX;
+            float ny = (unit.transform.position.z - minZ) / rangeZ;
 
             float px = mapRect.x + nx * mapRect.width;
             float py = mapRect.y + (1 - ny) * mapRect.height;
@@ -1398,8 +1367,8 @@ public class SquadCommandScreen : MonoBehaviour
         // Draw player on minimap
         if (player != null)
         {
-            float nx = (player.transform.position.x - minX) / (maxX - minX);
-            float ny = (player.transform.position.z - minZ) / (maxZ - minZ);
+            float nx = (player.transform.position.x - minX) / rangeX;
+            float ny = (player.transform.position.z - minZ) / rangeZ;
 
             float px = mapRect.x + nx * mapRect.width;
             float py = mapRect.y + (1 - ny) * mapRect.height;
