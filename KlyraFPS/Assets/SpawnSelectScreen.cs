@@ -101,6 +101,19 @@ public class SpawnSelectScreen : MonoBehaviour
         {
             cameraTransform = playerCamera.transform;
             deathPosition = cameraTransform.position;
+
+            // Ensure camera is unparented and reset (important after vehicle deaths)
+            cameraTransform.SetParent(null);
+
+            // Sanity check - if camera is in a weird position (underground or too high), reset it
+            if (deathPosition.y < -10f || deathPosition.y > 500f)
+            {
+                deathPosition = player.transform.position + Vector3.up * 20f;
+                cameraTransform.position = deathPosition;
+            }
+
+            // Reset camera rotation to look forward (avoids weird angles from vehicle deaths)
+            cameraTransform.rotation = Quaternion.Euler(0f, cameraTransform.eulerAngles.y, 0f);
         }
 
         // Find all capture points
@@ -277,6 +290,14 @@ public class SpawnSelectScreen : MonoBehaviour
     {
         if (!isActive) return;
 
+        // Refresh camera reference if lost
+        if (playerCamera == null)
+        {
+            playerCamera = Camera.main;
+            if (playerCamera != null)
+                cameraTransform = playerCamera.transform;
+        }
+
         InitStyles();
 
         // Draw title
@@ -407,6 +428,8 @@ public class SpawnSelectScreen : MonoBehaviour
     {
         // Draw team base spawn point
         if (baseSpawnPoint == null) return;
+        if (playerCamera == null) playerCamera = Camera.main;
+        if (playerCamera == null) return;
 
         Vector3 screenPos = playerCamera.WorldToScreenPoint(baseSpawnPoint.position);
         if (screenPos.z > 0)

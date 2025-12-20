@@ -1180,6 +1180,8 @@ MonoBehaviour:
   fireRate: 0.1
   damage: 25
   range: 100
+  muzzleFlashPrefab: {fileID: 1120296117247780, guid: a5ef242807d7c2649942d9d654c8c463, type: 3}
+  tracerPrefab: {fileID: 1046001694842650, guid: 9eb7304a6c9aedb40abba583aff826c5, type: 3}
   gunshotSound: {fileID: 8300000, guid: f6300effa65a243168dd09aae4f9a9df, type: 3}
   gunshotVolume: 0.7
   hitMarkerSound: {fileID: 0}
@@ -1196,6 +1198,7 @@ MonoBehaviour:
   playerTeam: 0
   maxSquadSize: 7
   recruitRadius: 15
+  vehicleEntryRadius: 5
   phantomSkinNames:
   - SM_Chr_Soldier_Male_01
   - SM_Chr_Soldier_Male_02

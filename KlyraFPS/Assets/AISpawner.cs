@@ -27,6 +27,12 @@ public class AISpawner : MonoBehaviour
 
     void Start()
     {
+        // Set the static prefab reference so AI can respawn themselves
+        if (aiPrefab != null)
+        {
+            AIController.aiPrefabReference = aiPrefab;
+        }
+
         // Start spawning after a short delay
         spawnTimer = 1f;
     }

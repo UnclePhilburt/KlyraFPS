@@ -1198,9 +1198,35 @@ MonoBehaviour:
   gunshotVolume: 0.5
   tracerColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   tracerDuration: 0.05
+  muzzleFlashPrefab: {fileID: 1126046646508270, guid: f913bc3b5f93c1d4cac760813a9a6bf1, type: 3}
+  tracerPrefab: {fileID: 1046001694842650, guid: 9eb7304a6c9aedb40abba583aff826c5, type: 3}
   squadRole: 1
   squadLeader: {fileID: 0}
   squadMembers: []
+  identity:
+    firstName: 
+    lastName: 
+    nickname: 
+    rank: 
+    rankTier: 0
+    callsign: 
+    age: 0
+    hometown: 
+    backstory: 
+    howTheyJoined: 
+    familyInfo: 
+    likes: []
+    dislikes: []
+    personalQuote: 
+    combatSpecialty: 
+    kills: 0
+    deaths: 0
+    missionsCompleted: 0
+  currentOrder: 0
+  orderedPoint: {fileID: 0}
+  orderedHelicopter: {fileID: 0}
+  holdPosition: {x: 0, y: 0, z: 0}
+  holdFacingDirection: {x: 0, y: 0, z: 0}
   phantomSkinNames:
   - SM_Chr_Soldier_Male_01
   - SM_Chr_Soldier_Male_02

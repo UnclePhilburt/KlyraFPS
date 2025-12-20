@@ -491,20 +491,37 @@ public class SquadCommandScreen : MonoBehaviour
     void IssueSinglePointOrder(Vector3 point)
     {
         // Check what's at the target
-        Collider[] colliders = Physics.OverlapSphere(point, 3f);
+        Collider[] colliders = Physics.OverlapSphere(point, 8f);
 
         CapturePoint targetPoint = null;
+        HelicopterController targetHeli = null;
+
         foreach (var col in colliders)
         {
-            targetPoint = col.GetComponentInParent<CapturePoint>();
-            if (targetPoint != null) break;
+            // Check for capture point
+            if (targetPoint == null)
+                targetPoint = col.GetComponentInParent<CapturePoint>();
+
+            // Check for helicopter
+            if (targetHeli == null)
+            {
+                targetHeli = col.GetComponentInParent<HelicopterController>();
+                // Only allow boarding friendly helicopters
+                if (targetHeli != null && targetHeli.helicopterTeam != player.playerTeam && targetHeli.helicopterTeam != Team.None)
+                    targetHeli = null;
+            }
         }
 
         foreach (var unit in selectedUnits)
         {
             if (unit == null) continue;
 
-            if (targetPoint != null)
+            if (targetHeli != null)
+            {
+                // Order to board helicopter
+                unit.SetOrder(AIController.OrderType.BoardHelicopter, targetHeli);
+            }
+            else if (targetPoint != null)
             {
                 // Order to capture/defend point
                 if (targetPoint.owningTeam == player.playerTeam)
@@ -620,6 +637,7 @@ public class SquadCommandScreen : MonoBehaviour
 
         // Draw world elements
         DrawCapturePoints();
+        DrawHelicopters();    // Draw helicopters
         DrawOtherTeammates(); // Draw non-squad teammates first (underneath)
         DrawUnits();          // Draw squad members on top
         DrawPlayer();
@@ -855,6 +873,87 @@ public class SquadCommandScreen : MonoBehaviour
 
             GUI.Label(new Rect(screenPos.x - 50, screenPos.y + size / 2 + 5, 100, 20), point.pointName, labelStyle);
         }
+    }
+
+    void DrawHelicopters()
+    {
+        if (playerCamera == null) return;
+
+        HelicopterController[] helis = FindObjectsOfType<HelicopterController>();
+
+        foreach (var heli in helis)
+        {
+            if (heli == null) continue;
+
+            Vector3 screenPos = playerCamera.WorldToScreenPoint(heli.transform.position);
+            if (screenPos.z < 0) continue;
+
+            screenPos.y = Screen.height - screenPos.y;
+
+            // Determine color based on team
+            Color color;
+            bool canBoard = false;
+
+            if (heli.helicopterTeam == player.playerTeam)
+            {
+                color = new Color(0.3f, 0.9f, 0.5f); // Bright green for friendly
+                canBoard = true;
+            }
+            else if (heli.helicopterTeam == Team.None)
+            {
+                color = new Color(0.8f, 0.8f, 0.3f); // Yellow for neutral (can board)
+                canBoard = true;
+            }
+            else
+            {
+                color = new Color(1f, 0.3f, 0.3f); // Red for enemy
+            }
+
+            // Draw helicopter icon (diamond shape)
+            float size = 24f;
+            float distanceFactor = Mathf.Clamp(50f / screenPos.z, 0.5f, 1.5f);
+            size *= distanceFactor;
+
+            GUI.color = color;
+
+            // Diamond shape (rotated square)
+            Matrix4x4 matrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(45, new Vector2(screenPos.x, screenPos.y));
+            GUI.DrawTexture(new Rect(screenPos.x - size / 2, screenPos.y - size / 2, size, size), whiteTex);
+
+            // Border (while still rotated)
+            GUI.color = new Color(1f, 1f, 1f, 0.8f);
+            GUI.DrawTexture(new Rect(screenPos.x - size / 2 - 1, screenPos.y - size / 2 - 1, size + 2, 2), whiteTex);
+            GUI.DrawTexture(new Rect(screenPos.x - size / 2 - 1, screenPos.y + size / 2 - 1, size + 2, 2), whiteTex);
+            GUI.DrawTexture(new Rect(screenPos.x - size / 2 - 1, screenPos.y - size / 2 - 1, 2, size + 2), whiteTex);
+            GUI.DrawTexture(new Rect(screenPos.x + size / 2 - 1, screenPos.y - size / 2 - 1, 2, size + 2), whiteTex);
+            GUI.matrix = matrix;
+
+            // Label
+            GUI.color = Color.white;
+            GUIStyle labelStyle = new GUIStyle();
+            labelStyle.fontSize = 11;
+            labelStyle.fontStyle = FontStyle.Bold;
+            labelStyle.alignment = TextAnchor.MiddleCenter;
+            labelStyle.normal.textColor = color;
+
+            string label = "HELI";
+            if (canBoard)
+            {
+                // Count available seats
+                HelicopterSeat[] seats = heli.GetComponentsInChildren<HelicopterSeat>();
+                int availableSeats = 0;
+                foreach (var seat in seats)
+                {
+                    if (!seat.IsOccupied) availableSeats++;
+                }
+                label = $"HELI ({availableSeats})";
+            }
+
+            GUI.Label(new Rect(screenPos.x - 40, screenPos.y + size / 2 + 5, 80, 20), label, labelStyle);
+        }
+
+        GUI.color = Color.white;
     }
 
     void DrawUnits()
@@ -1292,6 +1391,7 @@ public class SquadCommandScreen : MonoBehaviour
             case AIController.OrderType.DefendPoint: return "Defending";
             case AIController.OrderType.CapturePoint: return "Capturing";
             case AIController.OrderType.HoldPosition: return "Holding";
+            case AIController.OrderType.BoardHelicopter: return "Boarding Heli";
             default: return "";
         }
     }

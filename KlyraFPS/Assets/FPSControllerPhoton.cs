@@ -38,6 +38,10 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     public float damage = 25f;
     public float range = 100f;
 
+    [Header("Weapon Effects")]
+    public GameObject muzzleFlashPrefab;  // Assign FX_Gunshot_01 from Synty
+    public GameObject tracerPrefab;        // Assign FX_Bullet_Trail_Mesh from Synty
+
     [Header("Weapon Audio")]
     public AudioClip gunshotSound;
     public float gunshotVolume = 0.7f;
@@ -117,6 +121,30 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     private GUIStyle nameTagStyle;
     private bool uiStylesInitialized = false;
 
+    // Vehicle System
+    private bool isInVehicle = false;
+    private HelicopterSeat currentVehicleSeat;
+    public float vehicleEntryRadius = 5f;
+
+    // Helicopter interaction prompt
+    private HelicopterController lookingAtHelicopter = null;
+    private string helicopterPromptText = "";
+    private float helicopterPromptAlpha = 0f;
+
+    // Jet
+    private JetController currentJet = null;
+    private bool isInJet = false;
+    private JetController lookingAtJet = null;
+    private string jetPromptText = "";
+    private float jetPromptAlpha = 0f;
+
+    // Tank
+    private TankController currentTank = null;
+    private bool isInTank = false;
+    private TankController lookingAtTank = null;
+    private string tankPromptText = "";
+    private float tankPromptAlpha = 0f;
+
     [Header("Team Skins")]
     public string[] phantomSkinNames = { "SM_Chr_Soldier_Male_01", "SM_Chr_Soldier_Male_02", "SM_Chr_Soldier_Female_01" };
     public string[] havocSkinNames = { "SM_Chr_Insurgent_Male_01", "SM_Chr_Insurgent_Male_04", "SM_Chr_Insurgent_Female_01" };
@@ -150,7 +178,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         Camera[] prefabCameras = GetComponentsInChildren<Camera>();
         foreach (Camera cam in prefabCameras)
         {
-            Debug.Log($"Disabling prefab camera: {cam.name} on player {photonView.ViewID}");
             cam.enabled = false;
             // Also disable AudioListener if present
             AudioListener listener = cam.GetComponent<AudioListener>();
@@ -161,7 +188,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         if (photonView.InstantiationData != null && photonView.InstantiationData.Length > 0)
         {
             playerTeam = (Team)(int)photonView.InstantiationData[0];
-            Debug.Log($"Player {photonView.ViewID} assigned to team: {playerTeam}");
         }
 
         // Set up the correct skin for this player's team
@@ -203,7 +229,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
                 if (child.name == chosenSkin)
                 {
                     child.gameObject.SetActive(true);
-                    Debug.Log($"Enabled skin: {chosenSkin} for team {playerTeam}");
 
                     // Get animator from the skin if it exists
                     Animator skinAnimator = child.GetComponent<Animator>();
@@ -219,12 +244,9 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     void InitializeLocalPlayer()
     {
-        Debug.Log($"Initializing LOCAL player (ViewID: {photonView.ViewID})");
-
         // Ensure only one local player exists
         if (localPlayerInstance != null && localPlayerInstance != this)
         {
-            Debug.LogWarning($"Another local player already exists! This player (ViewID: {photonView.ViewID}) will be treated as remote.");
             InitializeRemotePlayer();
             return;
         }
@@ -236,7 +258,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         {
             if (cam.gameObject.name.StartsWith("PlayerCamera_"))
             {
-                Debug.Log($"Destroying old player camera: {cam.gameObject.name}");
                 Destroy(cam.gameObject);
             }
         }
@@ -267,7 +288,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         else
         {
             // No main camera, create one anyway
-            Debug.LogWarning("No main camera found, creating camera from scratch");
             GameObject camObj = new GameObject($"PlayerCamera_{photonView.ViewID}");
             playerCamera = camObj.AddComponent<Camera>();
             playerCamera.fieldOfView = normalFOV;
@@ -301,14 +321,10 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
         currentWeaponOffset = weaponOffset;
         isInitialized = true;
-
-        Debug.Log($"Local player initialized. Camera: {playerCamera?.name}, IsMine: {photonView.IsMine}");
     }
 
     void InitializeRemotePlayer()
     {
-        Debug.Log($"Initializing REMOTE player (ViewID: {photonView.ViewID})");
-
         // Add a CapsuleCollider for hit detection BEFORE disabling CharacterController
         // CharacterController is a collider, but we need to disable it for remote players
         // So we add a separate collider for raycasts to hit
@@ -396,6 +412,33 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         // Don't allow any actions while dead
         if (isDead) return;
 
+        // If in vehicle, only handle vehicle exit
+        if (isInVehicle)
+        {
+            // Handle jet exit and controls
+            if (isInJet && currentJet != null)
+            {
+                var keyboard = Keyboard.current;
+                if (keyboard != null && keyboard.fKey.wasPressedThisFrame)
+                {
+                    ExitJet();
+                }
+                // Jet controls handled by JetController
+            }
+            // Handle tank exit
+            else if (isInTank && currentTank != null)
+            {
+                var keyboard = Keyboard.current;
+                if (keyboard != null && keyboard.fKey.wasPressedThisFrame)
+                {
+                    ExitTank();
+                }
+                // Tank controls handled by TankController
+            }
+            // Helicopter controls handled by HelicopterSeat
+            return;
+        }
+
         // Always handle squad/TAB input first (so TAB works to close the screen)
         HandleSquad();
 
@@ -408,11 +451,17 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             return; // Don't process other player input while commanding
         }
 
+        // Check for vehicle entry with F key
+        HandleVehicleEntry();
+
         ReadInput();
         HandleMovement();
         HandleMouseLook();
         HandleShooting();
         HandleADS();
+        CheckLookingAtHelicopter();
+        CheckLookingAtJet();
+        CheckLookingAtTank();
         // Note: PositionWeapon moved to LateUpdate to sync with camera
     }
 
@@ -432,23 +481,15 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         {
             SquadCommandScreen screen = SquadCommandScreen.Instance;
 
-            Debug.Log($"TAB pressed: squadMembers={squadMembers.Count}, screenExists={screen != null}, screenActive={screen?.IsActive ?? false}");
-
             if (screen != null && screen.IsActive)
             {
                 // Close the screen
-                Debug.Log("Closing command screen via TAB in HandleSquad");
                 screen.Hide();
             }
             else if (squadMembers.Count > 0)
             {
                 // Open the screen
-                Debug.Log("Opening command screen");
                 OpenSquadCommandScreen();
-            }
-            else
-            {
-                Debug.Log("No squad members - can't open command screen");
             }
         }
 
@@ -501,22 +542,9 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
                 ai.JoinSquad(this);
                 squadMembers.Add(ai);
                 recruited++;
-                Debug.Log($"Recruited {ai.gameObject.name} to squad! Squad size: {squadMembers.Count}");
             }
         }
 
-        if (recruited > 0)
-        {
-            Debug.Log($"Recruited {recruited} AI to squad. Total: {squadMembers.Count}/{maxSquadSize}");
-        }
-        else if (squadMembers.Count >= maxSquadSize)
-        {
-            Debug.Log("Squad is full!");
-        }
-        else
-        {
-            Debug.Log("No friendly AI nearby to recruit.");
-        }
     }
 
     public void DisbandSquad()
@@ -529,7 +557,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             }
         }
         squadMembers.Clear();
-        Debug.Log("Squad disbanded.");
     }
 
     // Property for squad members to get leader's target
@@ -550,23 +577,606 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     void OpenSquadCommandScreen()
     {
-        Debug.Log("Opening squad command screen...");
-
         SquadCommandScreen commandScreen = FindObjectOfType<SquadCommandScreen>();
         if (commandScreen == null)
         {
-            Debug.Log("Creating new SquadCommandScreen");
             GameObject screenObj = new GameObject("SquadCommandScreen");
             commandScreen = screenObj.AddComponent<SquadCommandScreen>();
         }
-        else
-        {
-            Debug.Log($"Found existing SquadCommandScreen, isActive={commandScreen.IsActive}");
-        }
 
         commandScreen.Show(this);
-        Debug.Log($"Called Show(), isActive={commandScreen.IsActive}");
     }
+
+    void HandleVehicleEntry()
+    {
+        var keyboard = Keyboard.current;
+        if (keyboard == null) return;
+
+        if (keyboard.fKey.wasPressedThisFrame)
+        {
+            // Try tank first, then jet, then helicopter
+            if (!TryEnterNearbyTank())
+            {
+                if (!TryEnterNearbyJet())
+                {
+                    TryEnterNearbyHelicopter();
+                }
+            }
+        }
+    }
+
+    bool TryEnterNearbyTank()
+    {
+        TankController[] tanks = FindObjectsOfType<TankController>();
+
+        TankController closestTank = null;
+        float closestDist = vehicleEntryRadius;
+
+        foreach (var tank in tanks)
+        {
+            if (tank.isDestroyed) continue;
+            if (tank.HasDriver) continue; // Already has driver
+            if (tank.TankTeam != Team.None && tank.TankTeam != playerTeam) continue; // Enemy tank
+
+            float dist = Vector3.Distance(transform.position, tank.transform.position);
+            if (dist < closestDist)
+            {
+                closestDist = dist;
+                closestTank = tank;
+            }
+        }
+
+        if (closestTank != null)
+        {
+            EnterTank(closestTank);
+            return true;
+        }
+
+        return false;
+    }
+
+    void EnterTank(TankController tank)
+    {
+        currentTank = tank;
+        isInTank = true;
+        isInVehicle = true;
+
+        // Disable character controller
+        if (controller != null) controller.enabled = false;
+
+        // Hide player model
+        SetPlayerModelVisible(false);
+
+        // Disable collider
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        if (col != null) col.enabled = false;
+
+        // Parent to tank
+        transform.SetParent(tank.transform);
+        if (tank.driverSeat != null)
+            transform.localPosition = tank.driverSeat.localPosition;
+        else
+            transform.localPosition = Vector3.up * 2f;
+
+        // Tell tank we're the driver
+        tank.SetPlayerDriver(this);
+
+        Debug.Log("[Player] Entered tank - WASD to move, mouse to aim turret, LMB to fire, F to exit");
+    }
+
+    public void ExitTank()
+    {
+        if (currentTank == null) return;
+
+        // Tell tank we're leaving
+        currentTank.ClearPlayerDriver();
+
+        // Unparent and position next to tank
+        transform.SetParent(null);
+        transform.position = currentTank.transform.position + currentTank.transform.right * 5f + Vector3.up * 2f;
+
+        // Re-enable character controller
+        if (controller != null) controller.enabled = true;
+
+        // Show player model
+        SetPlayerModelVisible(true);
+
+        // Re-enable collider
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        if (col != null) col.enabled = true;
+
+        currentTank = null;
+        isInTank = false;
+        isInVehicle = false;
+
+        Debug.Log("[Player] Exited tank");
+    }
+
+    bool TryEnterNearbyJet()
+    {
+        JetController[] jets = FindObjectsOfType<JetController>();
+
+        JetController closestJet = null;
+        float closestDist = vehicleEntryRadius;
+
+        foreach (var jet in jets)
+        {
+            if (jet.isDestroyed) continue;
+            if (jet.HasPilot) continue; // Already has pilot
+            if (jet.JetTeam != Team.None && jet.JetTeam != playerTeam) continue; // Enemy jet
+
+            float dist = Vector3.Distance(transform.position, jet.transform.position);
+            if (dist < closestDist)
+            {
+                closestDist = dist;
+                closestJet = jet;
+            }
+        }
+
+        if (closestJet != null)
+        {
+            EnterJet(closestJet);
+            return true;
+        }
+
+        return false;
+    }
+
+    void EnterJet(JetController jet)
+    {
+        currentJet = jet;
+        isInJet = true;
+        isInVehicle = true;
+
+        // Disable character controller
+        if (controller != null) controller.enabled = false;
+
+        // Hide player model
+        SetPlayerModelVisible(false);
+
+        // Disable collider
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        if (col != null) col.enabled = false;
+
+        // Parent to jet
+        transform.SetParent(jet.transform);
+        if (jet.pilotSeatPosition != null)
+            transform.localPosition = jet.pilotSeatPosition.localPosition;
+        else
+            transform.localPosition = Vector3.zero;
+
+        // Tell jet we're the pilot
+        jet.SetPlayerPilot(this);
+
+        Debug.Log("[Player] Entered jet - F to exit, E to start engine");
+    }
+
+    public void ExitJet()
+    {
+        if (currentJet == null) return;
+
+        // Tell jet we're leaving
+        currentJet.ClearPlayerPilot();
+
+        // Unparent and position next to jet
+        transform.SetParent(null);
+        transform.position = currentJet.transform.position + currentJet.transform.right * 5f + Vector3.up * 2f;
+
+        // Re-enable character controller
+        if (controller != null) controller.enabled = true;
+
+        // Show player model
+        SetPlayerModelVisible(true);
+
+        // Re-enable collider
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        if (col != null) col.enabled = true;
+
+        currentJet = null;
+        isInJet = false;
+        isInVehicle = false;
+
+        Debug.Log("[Player] Exited jet");
+    }
+
+    void TryEnterNearbyHelicopter()
+    {
+        // First check if we're close enough to enter directly
+        HelicopterController[] helicopters = FindObjectsOfType<HelicopterController>();
+
+        HelicopterController closestHeli = null;
+        float closestDist = vehicleEntryRadius;
+
+        foreach (var heli in helicopters)
+        {
+            if (heli.isDestroyed) continue;
+
+            float dist = Vector3.Distance(transform.position, heli.transform.position);
+            if (dist < closestDist)
+            {
+                // Check if there's an available seat for our team
+                HelicopterSeat seat = heli.GetAvailableSeat(playerTeam);
+                if (seat != null)
+                {
+                    closestDist = dist;
+                    closestHeli = heli;
+                }
+            }
+        }
+
+        if (closestHeli != null)
+        {
+            HelicopterSeat seat = closestHeli.GetAvailableSeat(playerTeam);
+            if (seat != null)
+            {
+                seat.TryEnter(this);
+                return;
+            }
+        }
+
+        // Not close enough - check if we're looking at a helicopter to call it
+        TryCallHelicopter();
+    }
+
+    void TryCallHelicopter()
+    {
+        // Raycast to see what we're looking at
+        Camera cam = GetComponentInChildren<Camera>();
+        if (cam == null) return;
+
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit, 500f))
+        {
+            // Check if we hit a helicopter
+            HelicopterController heli = hit.collider.GetComponentInParent<HelicopterController>();
+            if (heli != null && !heli.isDestroyed)
+            {
+                // Check if it's friendly
+                if (heli.helicopterTeam == Team.None || heli.helicopterTeam == playerTeam)
+                {
+                    // Check if it has an AI pilot
+                    if (heli.HasAIPilot)
+                    {
+                        // Call the helicopter to us
+                        heli.CallToPlayer(this);
+                        Debug.Log($"Calling helicopter {heli.name} to player");
+                    }
+                    else
+                    {
+                        Debug.Log("Helicopter has no pilot to fly it to you");
+                    }
+                }
+                else
+                {
+                    Debug.Log("Cannot call enemy helicopter");
+                }
+            }
+        }
+    }
+
+    void CheckLookingAtHelicopter()
+    {
+        lookingAtHelicopter = null;
+        helicopterPromptText = "";
+
+        Camera cam = GetComponentInChildren<Camera>();
+        if (cam == null) return;
+
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit, 500f))
+        {
+            HelicopterController heli = hit.collider.GetComponentInParent<HelicopterController>();
+            if (heli != null && !heli.isDestroyed)
+            {
+                // Check if friendly
+                if (heli.helicopterTeam == Team.None || heli.helicopterTeam == playerTeam)
+                {
+                    lookingAtHelicopter = heli;
+
+                    float dist = Vector3.Distance(transform.position, heli.transform.position);
+
+                    if (dist < vehicleEntryRadius)
+                    {
+                        // Close enough to enter
+                        HelicopterSeat seat = heli.GetAvailableSeat(playerTeam);
+                        if (seat != null)
+                        {
+                            helicopterPromptText = "[F] Enter Helicopter";
+                        }
+                        else
+                        {
+                            helicopterPromptText = "Helicopter Full";
+                        }
+                    }
+                    else if (heli.HasAIPilot)
+                    {
+                        // Can call it
+                        helicopterPromptText = "[F] Call Helicopter";
+                    }
+                    else
+                    {
+                        helicopterPromptText = "No Pilot";
+                    }
+                }
+            }
+        }
+
+        // Animate prompt alpha
+        float targetAlpha = string.IsNullOrEmpty(helicopterPromptText) ? 0f : 1f;
+        helicopterPromptAlpha = Mathf.Lerp(helicopterPromptAlpha, targetAlpha, Time.deltaTime * 10f);
+    }
+
+    void CheckLookingAtJet()
+    {
+        lookingAtJet = null;
+        jetPromptText = "";
+
+        Camera cam = GetComponentInChildren<Camera>();
+        if (cam == null) return;
+
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit, 500f))
+        {
+            JetController jet = hit.collider.GetComponentInParent<JetController>();
+            if (jet != null && !jet.isDestroyed)
+            {
+                // Check if friendly
+                if (jet.JetTeam == Team.None || jet.JetTeam == playerTeam)
+                {
+                    lookingAtJet = jet;
+
+                    float dist = Vector3.Distance(transform.position, jet.transform.position);
+
+                    if (dist < vehicleEntryRadius)
+                    {
+                        // Close enough to enter
+                        if (!jet.HasPilot)
+                        {
+                            jetPromptText = "[F] Enter Jet";
+                        }
+                        else
+                        {
+                            jetPromptText = "Jet Occupied";
+                        }
+                    }
+                }
+            }
+        }
+
+        // Animate prompt alpha
+        float jetTargetAlpha = string.IsNullOrEmpty(jetPromptText) ? 0f : 1f;
+        jetPromptAlpha = Mathf.Lerp(jetPromptAlpha, jetTargetAlpha, Time.deltaTime * 10f);
+    }
+
+    void CheckLookingAtTank()
+    {
+        lookingAtTank = null;
+        tankPromptText = "";
+
+        Camera cam = GetComponentInChildren<Camera>();
+        if (cam == null) return;
+
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit, 100f))
+        {
+            TankController tank = hit.collider.GetComponentInParent<TankController>();
+            if (tank != null && !tank.isDestroyed)
+            {
+                // Check if friendly
+                if (tank.TankTeam == Team.None || tank.TankTeam == playerTeam)
+                {
+                    lookingAtTank = tank;
+
+                    float dist = Vector3.Distance(transform.position, tank.transform.position);
+
+                    if (dist < vehicleEntryRadius)
+                    {
+                        // Close enough to enter
+                        if (!tank.HasDriver)
+                        {
+                            tankPromptText = "[F] Enter Tank";
+                        }
+                        else
+                        {
+                            tankPromptText = "Tank Occupied";
+                        }
+                    }
+                }
+            }
+        }
+
+        // Animate prompt alpha
+        float tankTargetAlpha = string.IsNullOrEmpty(tankPromptText) ? 0f : 1f;
+        tankPromptAlpha = Mathf.Lerp(tankPromptAlpha, tankTargetAlpha, Time.deltaTime * 10f);
+    }
+
+    void DrawJetPrompt()
+    {
+        float centerX = Screen.width / 2f;
+        float centerY = Screen.height / 2f;
+
+        GUIStyle promptStyle = new GUIStyle(GUI.skin.label);
+        promptStyle.fontSize = Mathf.RoundToInt(Screen.height * 0.025f);
+        promptStyle.fontStyle = FontStyle.Bold;
+        promptStyle.alignment = TextAnchor.MiddleCenter;
+
+        float boxWidth = 200f;
+        float boxHeight = 45f;
+        float boxY = centerY + 80f;
+
+        // Background
+        GUI.color = new Color(0f, 0f, 0f, 0.6f * jetPromptAlpha);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, boxWidth, boxHeight), Texture2D.whiteTexture);
+
+        // Border - orange for jet
+        Color borderColor = new Color(1f, 0.6f, 0.2f, jetPromptAlpha);
+        GUI.color = borderColor;
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, boxWidth, 2), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY + boxHeight - 2, boxWidth, 2), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, 2, boxHeight), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX + boxWidth/2 - 2, boxY, 2, boxHeight), Texture2D.whiteTexture);
+
+        // Text shadow
+        GUI.color = new Color(0f, 0f, 0f, 0.8f * jetPromptAlpha);
+        GUI.Label(new Rect(centerX - boxWidth/2 + 2, boxY + 2, boxWidth, boxHeight), jetPromptText, promptStyle);
+
+        // Text
+        GUI.color = new Color(1f, 1f, 1f, jetPromptAlpha);
+        GUI.Label(new Rect(centerX - boxWidth/2, boxY, boxWidth, boxHeight), jetPromptText, promptStyle);
+
+        GUI.color = Color.white;
+    }
+
+    void DrawTankPrompt()
+    {
+        float centerX = Screen.width / 2f;
+        float centerY = Screen.height / 2f;
+
+        GUIStyle promptStyle = new GUIStyle(GUI.skin.label);
+        promptStyle.fontSize = Mathf.RoundToInt(Screen.height * 0.025f);
+        promptStyle.fontStyle = FontStyle.Bold;
+        promptStyle.alignment = TextAnchor.MiddleCenter;
+
+        float boxWidth = 200f;
+        float boxHeight = 45f;
+        float boxY = centerY + 80f;
+
+        // Background
+        GUI.color = new Color(0f, 0f, 0f, 0.6f * tankPromptAlpha);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, boxWidth, boxHeight), Texture2D.whiteTexture);
+
+        // Border - dark green for tank
+        Color borderColor = new Color(0.4f, 0.7f, 0.3f, tankPromptAlpha);
+        GUI.color = borderColor;
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, boxWidth, 2), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY + boxHeight - 2, boxWidth, 2), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, 2, boxHeight), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX + boxWidth/2 - 2, boxY, 2, boxHeight), Texture2D.whiteTexture);
+
+        // Text shadow
+        GUI.color = new Color(0f, 0f, 0f, 0.8f * tankPromptAlpha);
+        GUI.Label(new Rect(centerX - boxWidth/2 + 2, boxY + 2, boxWidth, boxHeight), tankPromptText, promptStyle);
+
+        // Text
+        GUI.color = new Color(1f, 1f, 1f, tankPromptAlpha);
+        GUI.Label(new Rect(centerX - boxWidth/2, boxY, boxWidth, boxHeight), tankPromptText, promptStyle);
+
+        GUI.color = Color.white;
+    }
+
+    void DrawHelicopterPrompt()
+    {
+        float centerX = Screen.width / 2f;
+        float centerY = Screen.height / 2f;
+
+        // Style
+        GUIStyle promptStyle = new GUIStyle(GUI.skin.label);
+        promptStyle.fontSize = Mathf.RoundToInt(Screen.height * 0.025f);
+        promptStyle.fontStyle = FontStyle.Bold;
+        promptStyle.alignment = TextAnchor.MiddleCenter;
+
+        // Calculate size
+        float boxWidth = 250f;
+        float boxHeight = 45f;
+        float boxY = centerY + 80f;
+
+        // Background
+        GUI.color = new Color(0f, 0f, 0f, 0.6f * helicopterPromptAlpha);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, boxWidth, boxHeight), Texture2D.whiteTexture);
+
+        // Border
+        bool isCallPrompt = helicopterPromptText.Contains("Call");
+        Color borderColor = isCallPrompt ? new Color(0.3f, 0.8f, 1f, helicopterPromptAlpha) : new Color(0.3f, 1f, 0.5f, helicopterPromptAlpha);
+        GUI.color = borderColor;
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, boxWidth, 2), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY + boxHeight - 2, boxWidth, 2), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX - boxWidth/2, boxY, 2, boxHeight), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(centerX + boxWidth/2 - 2, boxY, 2, boxHeight), Texture2D.whiteTexture);
+
+        // Text shadow
+        GUI.color = new Color(0f, 0f, 0f, 0.8f * helicopterPromptAlpha);
+        GUI.Label(new Rect(centerX - boxWidth/2 + 2, boxY + 2, boxWidth, boxHeight), helicopterPromptText, promptStyle);
+
+        // Text
+        GUI.color = new Color(1f, 1f, 1f, helicopterPromptAlpha);
+        GUI.Label(new Rect(centerX - boxWidth/2, boxY, boxWidth, boxHeight), helicopterPromptText, promptStyle);
+
+        GUI.color = Color.white;
+    }
+
+    public void OnEnterVehicleSeat(HelicopterSeat seat)
+    {
+        isInVehicle = true;
+        currentVehicleSeat = seat;
+
+        // Disable character controller
+        if (controller != null)
+        {
+            controller.enabled = false;
+        }
+
+        // Hide player model
+        SetPlayerModelVisible(false);
+
+        // Disable collider temporarily
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        if (col != null)
+        {
+            col.enabled = false;
+        }
+    }
+
+    public void OnExitVehicleSeat()
+    {
+        isInVehicle = false;
+        currentVehicleSeat = null;
+
+        // Re-enable character controller
+        if (controller != null)
+        {
+            controller.enabled = true;
+        }
+
+        // Show player model (for remote players)
+        SetPlayerModelVisible(true);
+
+        // Re-enable collider
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        if (col != null)
+        {
+            col.enabled = true;
+        }
+
+        // Lock cursor again
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    void SetPlayerModelVisible(bool visible)
+    {
+        // For local player, always hide body in first person
+        if (photonView.IsMine && visible)
+        {
+            HideLocalPlayerBody();
+            return;
+        }
+
+        SkinnedMeshRenderer[] skinnedRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
+        foreach (var renderer in skinnedRenderers)
+        {
+            renderer.enabled = visible;
+        }
+    }
+
+    public bool IsInVehicle => isInVehicle;
 
     void UpdateRemotePlayer()
     {
@@ -607,11 +1217,15 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         SpawnSelectScreen spawnScreen = SpawnSelectScreen.Instance;
         bool screenActive = (cmdScreen != null && cmdScreen.IsActive) || (spawnScreen != null && spawnScreen.IsActive);
 
-        // Update player rotation (always do this)
-        transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
+        // Update player rotation (always do this, even in vehicle)
+        if (!isInVehicle)
+        {
+            transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
+        }
 
-        // Update camera (only when no overlay screen is active)
-        if (cameraTransform != null && !screenActive)
+        // Update camera (only when no overlay screen is active and NOT in vehicle)
+        // When in vehicle, HelicopterSeat controls the camera
+        if (cameraTransform != null && !screenActive && !isInVehicle)
         {
             Vector3 targetPosition = transform.position + Vector3.up * cameraHeight;
             cameraTransform.position = targetPosition;
@@ -619,14 +1233,14 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
 
         // Position weapon AFTER camera is updated (prevents stutter)
-        // Hide weapon when screen is active
-        if (!screenActive)
+        // Hide weapon when screen is active or in vehicle
+        if (!screenActive && !isInVehicle)
         {
             PositionWeapon();
         }
         else if (weaponTransform != null)
         {
-            // Move weapon off-screen when in command view
+            // Move weapon off-screen when in command view or vehicle
             weaponTransform.position = Vector3.one * 9999f;
         }
     }
@@ -797,7 +1411,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             if (closePlayer == null && closeAI == null)
             {
                 // It's a wall/obstacle - bullet hits the wall
-                Debug.Log($"Shot blocked by nearby obstacle: {closeHit.collider.gameObject.name}");
                 Vector3 blockedStart = muzzlePoint != null ? muzzlePoint.position : cameraTransform.position;
                 SpawnTracer(blockedStart, closeHit.point);
                 StartCoroutine(MuzzleFlashCoroutine());
@@ -815,9 +1428,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         {
             endPoint = hit.point;
 
-            // Debug: log what we hit
-            Debug.Log($"Raycast hit: {hit.collider.gameObject.name} (layer: {LayerMask.LayerToName(hit.collider.gameObject.layer)})");
-
             // Check if we hit another player
             FPSControllerPhoton hitPlayer = hit.collider.GetComponent<FPSControllerPhoton>();
             if (hitPlayer == null)
@@ -831,11 +1441,10 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
                 // Check for friendly fire
                 if (hitPlayer.playerTeam == this.playerTeam)
                 {
-                    Debug.Log($"Friendly fire prevented - both players on team {playerTeam}");
+                    // Friendly fire - no damage
                 }
                 else
                 {
-                    Debug.Log($"Hit enemy player {hitPlayer.photonView.ViewID} (Team: {hitPlayer.playerTeam})!");
                     // Apply damage via RPC - call on the hit player's photonView
                     hitPlayer.photonView.RPC("RPC_TakeDamage", RpcTarget.All, damage, photonView.ViewID);
 
@@ -856,8 +1465,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
             if (hitAI != null && hitAI.isAIControlled && hitAI.team != playerTeam)
             {
-                Debug.Log($"Hit enemy AI {hitAI.gameObject.name} (Team: {hitAI.team})!");
-
                 // Check if this will be a kill
                 bool willKill = hitAI.currentHealth - damage <= 0;
 
@@ -921,7 +1528,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
         currentHealth -= damage;
         lastAttackerViewID = attackerViewID;
-        Debug.Log($"Player {photonView.ViewID} took {damage} damage from {attackerViewID}. Health: {currentHealth}/{maxHealth}");
 
         // Spawn blood hit effect
         SpawnBloodHit(transform.position + Vector3.up * 1.2f);
@@ -932,12 +1538,25 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
+    // Public method for external damage (e.g., from helicopter weapons)
+    public void TakeDamage(float damage, int attackerViewID)
+    {
+        if (isDead) return;
+        photonView.RPC("RPC_TakeDamage", RpcTarget.All, damage, attackerViewID);
+    }
+
     void Die()
     {
         if (isDead) return;
         isDead = true;
 
-        Debug.Log($"Player {photonView.ViewID} died!");
+        // Exit vehicle if in one
+        if (isInVehicle && currentVehicleSeat != null)
+        {
+            currentVehicleSeat.ForceExit();
+            isInVehicle = false;
+            currentVehicleSeat = null;
+        }
 
         // Spawn death blood effect
         SpawnBloodDeath(transform.position + Vector3.up * 0.5f);
@@ -1123,8 +1742,6 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         // Lock cursor again
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-
-        Debug.Log($"Player {photonView.ViewID} respawned at {selectedSpawnPos}");
     }
 
     void CleanupRagdoll()
@@ -1178,6 +1795,16 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     System.Collections.IEnumerator MuzzleFlashCoroutine()
     {
+        if (muzzleFlashPrefab != null && muzzlePoint != null)
+        {
+            // Use Synty prefab (FX_Gunshot_01)
+            GameObject flash = Instantiate(muzzleFlashPrefab, muzzlePoint.position, muzzlePoint.rotation);
+            flash.transform.SetParent(muzzlePoint);
+            Destroy(flash, 0.15f);
+            yield break;
+        }
+
+        // Fallback: Create procedural muzzle flash light
         if (muzzleFlash == null && muzzlePoint != null)
         {
             GameObject flashObj = new GameObject("MuzzleFlash");
@@ -1324,6 +1951,12 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
         InitUIStyles();
 
+        // Draw crosshair when aiming
+        if (isAiming && !isInVehicle)
+        {
+            DrawADSCrosshair();
+        }
+
         // Check what squad member we're looking at
         CheckLookingAtSquadMember();
 
@@ -1336,6 +1969,24 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
         // Draw markers for other teammates (green dots)
         DrawOtherTeammateMarkers();
+
+        // Draw helicopter interaction prompt
+        if (!isInVehicle && helicopterPromptAlpha > 0.01f && !string.IsNullOrEmpty(helicopterPromptText))
+        {
+            DrawHelicopterPrompt();
+        }
+
+        // Draw jet prompt
+        if (!isInVehicle && jetPromptAlpha > 0.01f && !string.IsNullOrEmpty(jetPromptText))
+        {
+            DrawJetPrompt();
+        }
+
+        // Draw tank prompt
+        if (!isInVehicle && tankPromptAlpha > 0.01f && !string.IsNullOrEmpty(tankPromptText))
+        {
+            DrawTankPrompt();
+        }
     }
 
     void CheckLookingAtSquadMember()
@@ -1471,5 +2122,73 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
             DrawTeammateMarker(player.transform, false, false, null);
         }
+    }
+
+    // Static texture for crosshair to prevent memory leak
+    private static Texture2D crosshairTexture;
+
+    void DrawADSCrosshair()
+    {
+        // Create texture once
+        if (crosshairTexture == null)
+        {
+            crosshairTexture = new Texture2D(1, 1);
+            crosshairTexture.SetPixel(0, 0, Color.white);
+            crosshairTexture.Apply();
+        }
+
+        float centerX = Screen.width / 2f;
+        float centerY = Screen.height / 2f;
+
+        // Crosshair settings
+        float lineLength = 8f;
+        float lineThickness = 2f;
+        float gap = 3f;
+        Color crosshairColor = new Color(1f, 1f, 1f, 0.9f);
+
+        GUI.color = crosshairColor;
+
+        // Top line
+        GUI.DrawTexture(new Rect(
+            centerX - lineThickness / 2f,
+            centerY - gap - lineLength,
+            lineThickness,
+            lineLength
+        ), crosshairTexture);
+
+        // Bottom line
+        GUI.DrawTexture(new Rect(
+            centerX - lineThickness / 2f,
+            centerY + gap,
+            lineThickness,
+            lineLength
+        ), crosshairTexture);
+
+        // Left line
+        GUI.DrawTexture(new Rect(
+            centerX - gap - lineLength,
+            centerY - lineThickness / 2f,
+            lineLength,
+            lineThickness
+        ), crosshairTexture);
+
+        // Right line
+        GUI.DrawTexture(new Rect(
+            centerX + gap,
+            centerY - lineThickness / 2f,
+            lineLength,
+            lineThickness
+        ), crosshairTexture);
+
+        // Center dot
+        float dotSize = 2f;
+        GUI.DrawTexture(new Rect(
+            centerX - dotSize / 2f,
+            centerY - dotSize / 2f,
+            dotSize,
+            dotSize
+        ), crosshairTexture);
+
+        GUI.color = Color.white;
     }
 }

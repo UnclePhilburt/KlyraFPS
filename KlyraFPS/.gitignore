@@ -1,0 +1,40 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# Visual Studio
+.vs/
+*.csproj
+*.sln
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Recovery/backup files
+Assets/_Recovery/
+
+# Test data
+Assets/Resources/PerformanceTestRunInfo.json
+Assets/Resources/PerformanceTestRunSettings.json
+
+# Incomplete downloads
+*.crdownload
+
+# Local settings
+../.claude/settings.local.json
+
+# Generated documentation (not needed for game)
+FLIGHT_SYSTEM_DIAGRAMS.md
+FLIGHT_SYSTEM_DOCUMENTATION.md
+FLIGHT_TUNING_QUICK_REFERENCE.md
+IMPLEMENTATION_SUMMARY.md
+QUICK_SETUP_GUIDE.md
+
+# Duplicate sounds folder outside Assets
+sounds/

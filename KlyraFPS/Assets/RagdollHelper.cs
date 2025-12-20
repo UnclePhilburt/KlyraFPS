@@ -141,6 +141,9 @@ public static class RagdollHelper
         // Debug: log found bones
         Debug.Log($"Ragdoll found {bones.Count} bones: {string.Join(", ", bones.Keys)}");
 
+        // Collect all colliders we create so we can make them ignore each other
+        List<Collider> boneColliders = new List<Collider>();
+
         // Add rigidbodies and colliders to bones
         Rigidbody hipsRb = null;
         foreach (var kvp in bones)
@@ -155,9 +158,11 @@ public static class RagdollHelper
                 rb = bone.gameObject.AddComponent<Rigidbody>();
             }
             rb.mass = GetBoneMass(boneType);
-            rb.linearDamping = 1f;
-            rb.angularDamping = 1f;
+            rb.linearDamping = 2f;  // Increased damping for stability
+            rb.angularDamping = 2f;
             rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            rb.maxAngularVelocity = 10f;  // Limit spin speed
 
             if (boneType == "hips")
             {
@@ -165,11 +170,32 @@ public static class RagdollHelper
             }
 
             // Add Collider
-            Collider existingCol = bone.gameObject.GetComponent<Collider>();
-            if (existingCol == null)
+            Collider col = bone.gameObject.GetComponent<Collider>();
+            if (col == null)
             {
                 CapsuleCollider capsule = bone.gameObject.AddComponent<CapsuleCollider>();
                 SetupBoneCollider(capsule, boneType);
+                col = capsule;
+            }
+            boneColliders.Add(col);
+        }
+
+        // CRITICAL: Make all bone colliders ignore each other to prevent internal explosions
+        for (int i = 0; i < boneColliders.Count; i++)
+        {
+            for (int j = i + 1; j < boneColliders.Count; j++)
+            {
+                Physics.IgnoreCollision(boneColliders[i], boneColliders[j], true);
+            }
+        }
+
+        // Also ignore collision with the main character collider if it exists
+        Collider mainCollider = character.GetComponent<Collider>();
+        if (mainCollider != null)
+        {
+            foreach (var boneCol in boneColliders)
+            {
+                Physics.IgnoreCollision(mainCollider, boneCol, true);
             }
         }
 
@@ -397,28 +423,54 @@ public static class RagdollHelper
         joint.connectedBody = parentRb;
         joint.enablePreprocessing = false;
 
-        // Configure limits
+        // CRITICAL: Set anchor at the connection point (where child meets parent)
+        // The anchor should be at the start of the child bone (near parent)
+        joint.anchor = Vector3.zero;  // Local origin of child
+
+        // Connected anchor is where on the parent this joint connects
+        // Convert child's position to parent's local space
+        Vector3 connectionPoint = parent.InverseTransformPoint(child.position);
+        joint.connectedAnchor = connectionPoint;
+
+        // Set axis to point along the bone
+        joint.axis = Vector3.right;
+        joint.swingAxis = Vector3.forward;
+
+        // Configure limits - reduced for more stability
         SoftJointLimit lowTwist = new SoftJointLimit();
         lowTwist.limit = -twist;
+        lowTwist.bounciness = 0f;
+        lowTwist.contactDistance = 0f;
         joint.lowTwistLimit = lowTwist;
 
         SoftJointLimit highTwist = new SoftJointLimit();
         highTwist.limit = twist;
+        highTwist.bounciness = 0f;
+        highTwist.contactDistance = 0f;
         joint.highTwistLimit = highTwist;
 
         SoftJointLimit swing1 = new SoftJointLimit();
         swing1.limit = swing;
+        swing1.bounciness = 0f;
+        swing1.contactDistance = 0f;
         joint.swing1Limit = swing1;
 
         SoftJointLimit swing2 = new SoftJointLimit();
         swing2.limit = swing * 0.5f;
+        swing2.bounciness = 0f;
+        swing2.contactDistance = 0f;
         joint.swing2Limit = swing2;
 
-        // Add some spring/damping for stability
+        // Strong spring/damping for stability - keeps bones together
         SoftJointLimitSpring spring = new SoftJointLimitSpring();
-        spring.spring = 100f;
-        spring.damper = 10f;
+        spring.spring = 500f;
+        spring.damper = 50f;
         joint.swingLimitSpring = spring;
         joint.twistLimitSpring = spring;
+
+        // Enable projection to prevent bones from separating
+        joint.enableProjection = true;
+        joint.projectionDistance = 0.01f;
+        joint.projectionAngle = 5f;
     }
 }

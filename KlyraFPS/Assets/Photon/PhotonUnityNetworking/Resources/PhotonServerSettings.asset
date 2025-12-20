@@ -42,6 +42,16 @@ MonoBehaviour:
   - RPC_ShootEffects
   - RPC_SpawnImpact
   - RPC_TakeDamage
+  - RPC_AddKillFeedEntry
+  - RPC_BroadcastKill
+  - RPC_ApplyDamage
+  - RPC_EnterSeat
+  - RPC_ExitSeat
+  - RPC_FireRocket
+  - RPC_MinigunFired
+  - RPC_SetEngineState
+  - RPC_FireGuns
+  - RPC_FireMissile
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1
