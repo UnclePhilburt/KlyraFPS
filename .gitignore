@@ -1,11 +1,13 @@
 # Unity generated folders
 [Ll]ibrary/
+_Recovery/
 [Tt]emp/
 [Oo]bj/
 [Bb]uild/
 [Bb]uilds/
 !serverbuild/
-!docs/Build/
+# WebGL builds - deploy to Cloudflare Pages instead
+docs/Build/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
 
