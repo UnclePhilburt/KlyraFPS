@@ -74,8 +74,8 @@ public class TankSpawner : MonoBehaviour
         }
         tank.tankTeam = spawnTeam;
 
-        // Add Photon components if in networked game
-        if (PhotonNetwork.IsConnected)
+        // Add Photon components if in a multiplayer room
+        if (PhotonNetwork.InRoom)
         {
             PhotonView pv = tankObj.GetComponent<PhotonView>();
             if (pv == null)

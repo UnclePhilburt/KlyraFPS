@@ -34,12 +34,12 @@ public class JetSpawner : MonoBehaviourPunCallbacks
 
     void Start()
     {
-        Debug.Log($"[JET SPAWNER] Start called. Connected: {PhotonNetwork.IsConnected}, IsMaster: {PhotonNetwork.IsMasterClient}");
+        Debug.Log($"[JET SPAWNER] Start called. Connected: {PhotonNetwork.IsConnected}, InRoom: {PhotonNetwork.InRoom}, IsMaster: {PhotonNetwork.IsMasterClient}");
 
-        // Only master client spawns jets
-        if (PhotonNetwork.IsConnected && !PhotonNetwork.IsMasterClient)
+        // Only spawn if: not in a room, OR in a room and master client
+        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
         {
-            Debug.Log("[JET SPAWNER] Not master client, skipping spawn");
+            Debug.Log("[JET SPAWNER] Not master client in room, skipping spawn");
             return;
         }
 
@@ -99,9 +99,9 @@ public class JetSpawner : MonoBehaviourPunCallbacks
 
         GameObject jetObj;
 
-        if (PhotonNetwork.IsConnected)
+        if (PhotonNetwork.InRoom)
         {
-            // Networked spawn
+            // Networked spawn (only works when in a room)
             object[] instantiationData = new object[] { (int)team };
             jetObj = PhotonNetwork.Instantiate(
                 jetPrefab.name,
@@ -113,7 +113,7 @@ public class JetSpawner : MonoBehaviourPunCallbacks
         }
         else
         {
-            // Offline spawn
+            // Offline/solo spawn
             jetObj = Instantiate(jetPrefab, spawnPos, spawnRot);
         }
 
@@ -184,8 +184,8 @@ public class JetSpawner : MonoBehaviourPunCallbacks
 
     void Update()
     {
-        // Only master client handles respawning
-        if (PhotonNetwork.IsConnected && !PhotonNetwork.IsMasterClient)
+        // Only master client handles respawning (or offline mode)
+        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
             return;
 
         // Check for destroyed jets

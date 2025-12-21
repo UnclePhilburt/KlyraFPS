@@ -76,8 +76,8 @@ public class HumveeSpawner : MonoBehaviour
         }
         humvee.humveeTeam = spawnTeam;
 
-        // Add Photon components
-        if (PhotonNetwork.IsConnected)
+        // Add Photon components if in a multiplayer room
+        if (PhotonNetwork.InRoom)
         {
             PhotonView pv = humveeObj.GetComponent<PhotonView>();
             if (pv == null)

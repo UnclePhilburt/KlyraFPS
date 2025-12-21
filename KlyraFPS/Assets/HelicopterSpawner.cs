@@ -35,13 +35,24 @@ public class HelicopterSpawner : MonoBehaviourPunCallbacks
 
     void Start()
     {
-        // Only the master client spawns helicopters
-        if (PhotonNetwork.IsConnected && !PhotonNetwork.IsMasterClient)
+        Debug.Log($"[HELI SPAWNER] Start called. Connected: {PhotonNetwork.IsConnected}, InRoom: {PhotonNetwork.InRoom}, IsMaster: {PhotonNetwork.IsMasterClient}");
+        Debug.Log($"[HELI SPAWNER] spawnOnStart: {spawnOnStart}, prefab: {transportHelicopterPrefab}, phantomPads: {phantomHelipads?.Length ?? 0}, havocPads: {havocHelipads?.Length ?? 0}");
+
+        // Only spawn if: not in a room, OR in a room and master client
+        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
+        {
+            Debug.Log("[HELI SPAWNER] Not master client in room, skipping spawn");
             return;
+        }
 
         if (spawnOnStart)
         {
+            Debug.Log("[HELI SPAWNER] Calling SpawnInitialHelicopters");
             SpawnInitialHelicopters();
+        }
+        else
+        {
+            Debug.Log("[HELI SPAWNER] spawnOnStart is false, not spawning");
         }
     }
 
@@ -71,9 +82,9 @@ public class HelicopterSpawner : MonoBehaviourPunCallbacks
 
         GameObject heliObj;
 
-        if (PhotonNetwork.IsConnected)
+        if (PhotonNetwork.InRoom)
         {
-            // Networked spawn
+            // Networked spawn (only works when in a room)
             object[] instantiationData = new object[] { (int)team };
             heliObj = PhotonNetwork.Instantiate(
                 transportHelicopterPrefab.name,
@@ -85,7 +96,7 @@ public class HelicopterSpawner : MonoBehaviourPunCallbacks
         }
         else
         {
-            // Offline spawn
+            // Offline/solo spawn
             heliObj = Instantiate(transportHelicopterPrefab, spawnPoint.position, spawnPoint.rotation);
         }
 
@@ -170,8 +181,8 @@ public class HelicopterSpawner : MonoBehaviourPunCallbacks
 
     void Update()
     {
-        // Only master client handles respawning
-        if (PhotonNetwork.IsConnected && !PhotonNetwork.IsMasterClient)
+        // Only master client handles respawning (or offline mode)
+        if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
             return;
 
         // Check for destroyed helicopters
