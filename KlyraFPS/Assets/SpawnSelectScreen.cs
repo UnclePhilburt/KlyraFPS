@@ -117,10 +117,10 @@ public class SpawnSelectScreen : MonoBehaviour
         }
 
         // Find all capture points
-        allPoints = FindObjectsOfType<CapturePoint>();
+        allPoints = FindObjectsByType<CapturePoint>(FindObjectsSortMode.None);
 
         // Find base spawn point
-        GameUIManager gameUI = FindObjectOfType<GameUIManager>();
+        GameUIManager gameUI = FindFirstObjectByType<GameUIManager>();
         if (gameUI != null)
         {
             baseSpawnPoint = playerTeam == Team.Phantom ? gameUI.phantomSpawnPoint : gameUI.havocSpawnPoint;

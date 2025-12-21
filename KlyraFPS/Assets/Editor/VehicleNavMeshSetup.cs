@@ -240,8 +240,8 @@ public static class VehicleNavMeshQuickBake
     [MenuItem("Tools/Quick Bake Vehicle NavMesh")]
     public static void QuickBake()
     {
-        // This triggers a NavMesh bake with current settings
-        UnityEditor.AI.NavMeshBuilder.BuildNavMesh();
-        Debug.Log("[VehicleNavMesh] NavMesh baked!");
+        // Use the standard Unity navigation bake via menu
+        EditorApplication.ExecuteMenuItem("Window/AI/Navigation");
+        Debug.Log("[VehicleNavMesh] Open Navigation window and click Bake!");
     }
 }

@@ -146,8 +146,32 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     private float tankPromptAlpha = 0f;
 
     [Header("Team Skins")]
-    public string[] phantomSkinNames = { "SM_Chr_Soldier_Male_01", "SM_Chr_Soldier_Male_02", "SM_Chr_Soldier_Female_01" };
-    public string[] havocSkinNames = { "SM_Chr_Insurgent_Male_01", "SM_Chr_Insurgent_Male_04", "SM_Chr_Insurgent_Female_01" };
+    public string[] phantomSkinNames = {
+        "SM_Chr_Soldier_Male_01",
+        "SM_Chr_Soldier_Male_02",
+        "SM_Chr_Soldier_Female_01",
+        "SM_Chr_Soldier_Female_02",
+        "SM_Chr_Contractor_Male_01",
+        "SM_Chr_Contractor_Male_02",
+        "SM_Chr_Contractor_Female_01",
+        "SM_Chr_Ghillie_Male_01",
+        "SM_Chr_Pilot_Male_01",
+        "SM_Chr_Pilot_Female_01"
+    };
+    public string[] havocSkinNames = {
+        "SM_Chr_Insurgent_Male_01",
+        "SM_Chr_Insurgent_Male_02",
+        "SM_Chr_Insurgent_Male_03",
+        "SM_Chr_Insurgent_Male_04",
+        "SM_Chr_Insurgent_Male_05",
+        "SM_Chr_Insurgent_Female_01",
+        "SM_Chr_Insurgent_Female_02"
+    };
+
+    [Header("Customization Attachments")]
+    public GameObject[] headgearPrefabs;
+    public GameObject[] facewearPrefabs;
+    public GameObject[] backpackPrefabs;
 
     void Start()
     {
@@ -218,27 +242,110 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         // Choose which skins to use based on team
         string[] skinNames = playerTeam == Team.Phantom ? phantomSkinNames : havocSkinNames;
 
-        // Pick a random skin from the team's options
-        if (skinNames.Length > 0)
+        // Load saved character index from PlayerPrefs (falls back to random if not set)
+        string teamName = playerTeam == Team.Phantom ? "Phantom" : "Havoc";
+        int savedCharIndex = PlayerPrefs.GetInt($"{teamName}_CharacterIndex", -1);
+
+        string chosenSkin;
+        if (savedCharIndex >= 0 && savedCharIndex < skinNames.Length)
         {
-            string chosenSkin = skinNames[Random.Range(0, skinNames.Length)];
+            // Use saved character from customizer
+            chosenSkin = skinNames[savedCharIndex];
+        }
+        else if (skinNames.Length > 0)
+        {
+            // Fallback to random if no saved customization
+            chosenSkin = skinNames[Random.Range(0, skinNames.Length)];
+        }
+        else
+        {
+            return;
+        }
 
-            // Find and enable the chosen skin
-            foreach (Transform child in allChildren)
+        // Find and enable the chosen skin
+        Transform activeCharacter = null;
+        foreach (Transform child in allChildren)
+        {
+            if (child.name == chosenSkin)
             {
-                if (child.name == chosenSkin)
-                {
-                    child.gameObject.SetActive(true);
+                child.gameObject.SetActive(true);
+                activeCharacter = child;
 
-                    // Get animator from the skin if it exists
-                    Animator skinAnimator = child.GetComponent<Animator>();
-                    if (skinAnimator != null)
-                    {
-                        animator = skinAnimator;
-                    }
-                    break;
+                // Get animator from the skin if it exists
+                Animator skinAnimator = child.GetComponent<Animator>();
+                if (skinAnimator != null)
+                {
+                    animator = skinAnimator;
                 }
+                break;
             }
+        }
+
+        // Apply saved attachments
+        if (activeCharacter != null)
+        {
+            ApplyCharacterAttachments(activeCharacter, teamName);
+        }
+    }
+
+    void ApplyCharacterAttachments(Transform character, string teamName)
+    {
+        // Find attachment points
+        Transform headPoint = null, facePoint = null, backPoint = null;
+        var transforms = character.GetComponentsInChildren<Transform>();
+
+        foreach (var t in transforms)
+        {
+            string name = t.name.ToLower();
+
+            // Hide original attachments
+            if (name.Contains("attach_"))
+            {
+                if (name.Contains("backpack") || name.Contains("pouch"))
+                {
+                    if (backPoint == null) backPoint = t.parent;
+                }
+                t.gameObject.SetActive(false);
+            }
+
+            // Find bone attachment points
+            if (headPoint == null && name.Contains("head") && !name.Contains("headset"))
+                headPoint = t;
+            else if (facePoint == null && (name.Contains("neck") || name.Contains("jaw")))
+                facePoint = t;
+            else if (backPoint == null && name.Contains("spine") && name.Contains("02"))
+                backPoint = t;
+        }
+
+        if (facePoint == null) facePoint = headPoint;
+
+        // Load saved attachment indices
+        int headIndex = PlayerPrefs.GetInt($"{teamName}_HeadgearIndex", -1);
+        int faceIndex = PlayerPrefs.GetInt($"{teamName}_FacewearIndex", -1);
+        int backIndex = PlayerPrefs.GetInt($"{teamName}_BackpackIndex", -1);
+
+        // Apply headgear
+        if (headIndex >= 0 && headIndex < headgearPrefabs.Length && headPoint != null && headgearPrefabs[headIndex] != null)
+        {
+            var attachment = Instantiate(headgearPrefabs[headIndex], headPoint);
+            attachment.transform.localPosition = Vector3.zero;
+            attachment.transform.localRotation = Quaternion.identity;
+        }
+
+        // Apply facewear
+        if (faceIndex >= 0 && faceIndex < facewearPrefabs.Length && facePoint != null && facewearPrefabs[faceIndex] != null)
+        {
+            var attachment = Instantiate(facewearPrefabs[faceIndex], facePoint);
+            attachment.transform.localPosition = Vector3.zero;
+            attachment.transform.localRotation = Quaternion.identity;
+        }
+
+        // Apply backpack
+        if (backIndex >= 0 && backIndex < backpackPrefabs.Length && backPoint != null && backpackPrefabs[backIndex] != null)
+        {
+            var attachment = Instantiate(backpackPrefabs[backIndex], backPoint);
+            attachment.transform.localPosition = Vector3.zero;
+            attachment.transform.localRotation = Quaternion.identity;
         }
     }
 
@@ -253,7 +360,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         localPlayerInstance = this;
 
         // Destroy any existing player cameras first
-        Camera[] allCameras = FindObjectsOfType<Camera>();
+        Camera[] allCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         foreach (Camera cam in allCameras)
         {
             if (cam.gameObject.name.StartsWith("PlayerCamera_"))
@@ -299,7 +406,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
 
         // Disable AudioListener on main camera if it exists
-        AudioListener[] listeners = FindObjectsOfType<AudioListener>();
+        AudioListener[] listeners = FindObjectsByType<AudioListener>(FindObjectsSortMode.None);
         foreach (AudioListener listener in listeners)
         {
             if (listener.gameObject != cameraTransform?.gameObject)
@@ -512,7 +619,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     void RecruitNearbySquad()
     {
         // Find all friendly AI within radius
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
 
         int recruited = 0;
         foreach (AIController ai in allAI)
@@ -577,7 +684,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     void OpenSquadCommandScreen()
     {
-        SquadCommandScreen commandScreen = FindObjectOfType<SquadCommandScreen>();
+        SquadCommandScreen commandScreen = FindFirstObjectByType<SquadCommandScreen>();
         if (commandScreen == null)
         {
             GameObject screenObj = new GameObject("SquadCommandScreen");
@@ -607,7 +714,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     bool TryEnterNearbyTank()
     {
-        TankController[] tanks = FindObjectsOfType<TankController>();
+        TankController[] tanks = FindObjectsByType<TankController>(FindObjectsSortMode.None);
 
         TankController closestTank = null;
         float closestDist = vehicleEntryRadius;
@@ -694,7 +801,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     bool TryEnterNearbyJet()
     {
-        JetController[] jets = FindObjectsOfType<JetController>();
+        JetController[] jets = FindObjectsByType<JetController>(FindObjectsSortMode.None);
 
         JetController closestJet = null;
         float closestDist = vehicleEntryRadius;
@@ -782,7 +889,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     void TryEnterNearbyHelicopter()
     {
         // First check if we're close enough to enter directly
-        HelicopterController[] helicopters = FindObjectsOfType<HelicopterController>();
+        HelicopterController[] helicopters = FindObjectsByType<HelicopterController>(FindObjectsSortMode.None);
 
         HelicopterController closestHeli = null;
         float closestDist = vehicleEntryRadius;
@@ -1669,7 +1776,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
     static FPSControllerPhoton FindLocalPlayer()
     {
-        FPSControllerPhoton[] players = FindObjectsOfType<FPSControllerPhoton>();
+        FPSControllerPhoton[] players = FindObjectsByType<FPSControllerPhoton>(FindObjectsSortMode.None);
         foreach (var p in players)
         {
             if (p.photonView.IsMine)
@@ -1687,7 +1794,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         CleanupRagdoll();
 
         // Show spawn selection screen
-        SpawnSelectScreen spawnScreen = FindObjectOfType<SpawnSelectScreen>();
+        SpawnSelectScreen spawnScreen = FindFirstObjectByType<SpawnSelectScreen>();
         if (spawnScreen == null)
         {
             // Create spawn screen if it doesn't exist
@@ -2103,7 +2210,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     void DrawOtherTeammateMarkers()
     {
         // Draw markers for friendly AI not in squad
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
         foreach (var ai in allAI)
         {
             if (ai == null || ai.isDead) continue;
@@ -2114,7 +2221,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
 
         // Draw markers for friendly players
-        FPSControllerPhoton[] allPlayers = FindObjectsOfType<FPSControllerPhoton>();
+        FPSControllerPhoton[] allPlayers = FindObjectsByType<FPSControllerPhoton>(FindObjectsSortMode.None);
         foreach (var player in allPlayers)
         {
             if (player == null || player == this || player.isDead) continue;

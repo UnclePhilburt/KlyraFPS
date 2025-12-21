@@ -115,7 +115,7 @@ public class KillFeedManager : MonoBehaviour
     void OnGUI()
     {
         // Only draw during gameplay
-        GameUIManager gameUI = FindObjectOfType<GameUIManager>();
+        GameUIManager gameUI = FindFirstObjectByType<GameUIManager>();
         if (gameUI != null && gameUI.currentState != GameUIManager.GameState.InGame)
             return;
 

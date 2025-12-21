@@ -150,7 +150,7 @@ public class HelicopterSeat : MonoBehaviour
         Camera playerCam = Camera.main;
         if (playerCam == null)
         {
-            Camera[] cameras = FindObjectsOfType<Camera>();
+            Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
             foreach (Camera cam in cameras)
             {
                 if (cam.enabled)
@@ -229,7 +229,7 @@ public class HelicopterSeat : MonoBehaviour
     void SetupHUD()
     {
         // Find or create helicopter HUD
-        HelicopterHUD hud = FindObjectOfType<HelicopterHUD>();
+        HelicopterHUD hud = FindFirstObjectByType<HelicopterHUD>();
         if (hud == null)
         {
             GameObject hudObj = new GameObject("HelicopterHUD");
@@ -242,7 +242,7 @@ public class HelicopterSeat : MonoBehaviour
 
     void CleanupHUD()
     {
-        HelicopterHUD hud = FindObjectOfType<HelicopterHUD>();
+        HelicopterHUD hud = FindFirstObjectByType<HelicopterHUD>();
         if (hud != null)
         {
             Destroy(hud.gameObject);
@@ -401,7 +401,7 @@ public class HelicopterSeat : MonoBehaviour
         Camera playerCam = Camera.main;
         if (playerCam == null)
         {
-            Camera[] cameras = FindObjectsOfType<Camera>();
+            Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
             foreach (Camera cam in cameras)
             {
                 if (cam.enabled)
@@ -514,7 +514,9 @@ public class HelicopterSeat : MonoBehaviour
     }
 
     // Track if we're in free look mode
-    private bool isFreeLook = false;
+    #pragma warning disable CS0414
+    private bool isFreeLook = false;  // Reserved for free look feature
+    #pragma warning restore CS0414
     private float freeLookYawOffset = 0f;
 
     // Handle input for camera orbit (runs in Update)
@@ -557,7 +559,7 @@ public class HelicopterSeat : MonoBehaviour
             seatCamera = Camera.main;
             if (seatCamera == null)
             {
-                Camera[] cameras = FindObjectsOfType<Camera>();
+                Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
                 foreach (Camera cam in cameras)
                 {
                     if (cam.enabled)

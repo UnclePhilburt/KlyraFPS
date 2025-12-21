@@ -55,7 +55,9 @@ public class HelicopterController : MonoBehaviourPunCallbacks, IPunObservable
     private Rigidbody rb;
 
     // Input
-    private float throttleInput = 0f;
+    #pragma warning disable CS0414
+    private float throttleInput = 0f;  // Reserved for throttle feature
+    #pragma warning restore CS0414
     private float collectiveInput = 0f;
     private Vector2 cyclicInput;
     private float yawInput = 0f;
@@ -197,9 +199,6 @@ public class HelicopterController : MonoBehaviourPunCallbacks, IPunObservable
             currentRotorSpeed = Mathf.Lerp(currentRotorSpeed, networkRotorSpeed, Time.deltaTime * 5f);
         }
     }
-
-    // Debug timer
-    private float debugTimer = 0f;
 
     void FixedUpdate()
     {
@@ -750,7 +749,7 @@ public class HelicopterController : MonoBehaviourPunCallbacks, IPunObservable
     void RecruitAIGunners(Team pilotTeam)
     {
         // Find nearby friendly AI to become gunners
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
         float recruitRange = 20f;
 
         foreach (var seat in seats)

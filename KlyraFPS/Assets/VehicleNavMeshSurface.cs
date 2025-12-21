@@ -50,7 +50,9 @@ public class VehicleNavMeshSurface : MonoBehaviour
     private NavMeshDataInstance navMeshInstance;
 
     [Header("Status")]
-    [SerializeField] private bool isBaked = false;
+    #pragma warning disable CS0414
+    [SerializeField] private bool isBaked = false;  // Displayed in Inspector
+    #pragma warning restore CS0414
     [SerializeField] private int triangleCount = 0;
 
     void OnEnable()
@@ -172,7 +174,7 @@ public class VehicleNavMeshSurface : MonoBehaviour
     void CollectFromAll(List<NavMeshBuildSource> sources)
     {
         // Collect all meshes
-        MeshFilter[] meshFilters = FindObjectsOfType<MeshFilter>();
+        MeshFilter[] meshFilters = FindObjectsByType<MeshFilter>(FindObjectsSortMode.None);
         foreach (MeshFilter mf in meshFilters)
         {
             if (!IsInLayerMask(mf.gameObject, includeLayers)) continue;
@@ -187,7 +189,7 @@ public class VehicleNavMeshSurface : MonoBehaviour
         }
 
         // Collect all terrains
-        Terrain[] terrains = FindObjectsOfType<Terrain>();
+        Terrain[] terrains = FindObjectsByType<Terrain>(FindObjectsSortMode.None);
         foreach (Terrain t in terrains)
         {
             if (!IsInLayerMask(t.gameObject, includeLayers)) continue;
@@ -206,7 +208,7 @@ public class VehicleNavMeshSurface : MonoBehaviour
         Bounds bounds = new Bounds(transform.position, volumeSize);
 
         // Collect meshes in volume
-        MeshFilter[] meshFilters = FindObjectsOfType<MeshFilter>();
+        MeshFilter[] meshFilters = FindObjectsByType<MeshFilter>(FindObjectsSortMode.None);
         foreach (MeshFilter mf in meshFilters)
         {
             if (!IsInLayerMask(mf.gameObject, includeLayers)) continue;
@@ -222,7 +224,7 @@ public class VehicleNavMeshSurface : MonoBehaviour
         }
 
         // Collect terrains in volume
-        Terrain[] terrains = FindObjectsOfType<Terrain>();
+        Terrain[] terrains = FindObjectsByType<Terrain>(FindObjectsSortMode.None);
         foreach (Terrain t in terrains)
         {
             if (!IsInLayerMask(t.gameObject, includeLayers)) continue;
@@ -275,7 +277,7 @@ public class VehicleNavMeshSurface : MonoBehaviour
         Bounds bounds = new Bounds(transform.position, Vector3.zero);
         bool first = true;
 
-        MeshFilter[] meshFilters = FindObjectsOfType<MeshFilter>();
+        MeshFilter[] meshFilters = FindObjectsByType<MeshFilter>(FindObjectsSortMode.None);
         foreach (MeshFilter mf in meshFilters)
         {
             Renderer r = mf.GetComponent<Renderer>();
@@ -292,7 +294,7 @@ public class VehicleNavMeshSurface : MonoBehaviour
             }
         }
 
-        Terrain[] terrains = FindObjectsOfType<Terrain>();
+        Terrain[] terrains = FindObjectsByType<Terrain>(FindObjectsSortMode.None);
         foreach (Terrain t in terrains)
         {
             Bounds tBounds = new Bounds(

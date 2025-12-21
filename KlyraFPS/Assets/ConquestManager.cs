@@ -46,7 +46,7 @@ public class ConquestManager : MonoBehaviourPunCallbacks, IPunObservable
         // Auto-find capture points if not assigned
         if (capturePoints.Count == 0)
         {
-            capturePoints.AddRange(FindObjectsOfType<CapturePoint>());
+            capturePoints.AddRange(FindObjectsByType<CapturePoint>(FindObjectsSortMode.None));
         }
     }
 

@@ -2,10 +2,16 @@ using UnityEngine;
 using UnityEngine.AI;
 using System.Collections.Generic;
 
+#pragma warning disable CS0414 // Field is assigned but never used (reserved for future features)
+
 public class AIController : MonoBehaviour
 {
     [Header("Team")]
     public Team team = Team.Phantom;
+
+    // Performance culling
+    private float cullUpdateInterval = 0f;
+    private float cullUpdateTimer = 0f;
 
     [Header("Movement")]
     public float moveSpeed = 5f;
@@ -71,11 +77,38 @@ public class AIController : MonoBehaviour
     public Vector3 holdFacingDirection; // Direction to face when holding position
 
     [Header("Skins")]
-    public string[] phantomSkinNames = { "SM_Chr_Soldier_Male_01", "SM_Chr_Soldier_Male_02" };
-    public string[] havocSkinNames = { "SM_Chr_Insurgent_Male_01", "SM_Chr_Insurgent_Male_04" };
+    public string[] phantomSkinNames = {
+        "SM_Chr_Soldier_Male_01",
+        "SM_Chr_Soldier_Male_02",
+        "SM_Chr_Soldier_Female_01",
+        "SM_Chr_Soldier_Female_02",
+        "SM_Chr_Contractor_Male_01",
+        "SM_Chr_Contractor_Male_02",
+        "SM_Chr_Contractor_Female_01",
+        "SM_Chr_Ghillie_Male_01",
+        "SM_Chr_Pilot_Male_01",
+        "SM_Chr_Pilot_Female_01"
+    };
+    public string[] havocSkinNames = {
+        "SM_Chr_Insurgent_Male_01",
+        "SM_Chr_Insurgent_Male_02",
+        "SM_Chr_Insurgent_Male_03",
+        "SM_Chr_Insurgent_Male_04",
+        "SM_Chr_Insurgent_Male_05",
+        "SM_Chr_Insurgent_Female_01",
+        "SM_Chr_Insurgent_Female_02"
+    };
+
+    [Header("Random Attachments")]
+    public GameObject[] headgearPrefabs;
+    public GameObject[] facewearPrefabs;
+    public GameObject[] backpackPrefabs;
+    [Range(0f, 1f)] public float headgearChance = 0.7f;
+    [Range(0f, 1f)] public float facewearChance = 0.3f;
+    [Range(0f, 1f)] public float backpackChance = 0.5f;
 
     // State machine
-    public enum AIState { Idle, MovingToPoint, Capturing, Combat, Dead, HeliGunner, HeliPilot, HeliPassenger, BoardingHelicopter, JetPilot, TankDriver, TankPassenger }
+    public enum AIState { Idle, MovingToPoint, Capturing, Combat, Dead, HeliGunner, HeliPilot, HeliPassenger, BoardingHelicopter, JetPilot, TankDriver, TankPassenger, HumveeDriver, HumveeGunner, HumveePassenger }
     public AIState currentState = AIState.Idle;
 
     // Helicopter gunner
@@ -253,6 +286,24 @@ public class AIController : MonoBehaviour
     // Tank Navigation - Ambush Caution
     private bool tankInChokePoint = false;
     private float tankCautionSpeedMult = 1f;
+
+    // Humvee Driver/Gunner
+    private HumveeController drivingHumvee;
+    private HumveeController gunningHumvee;
+    private bool isDedicatedHumveeDriver = false;
+    private bool isDedicatedHumveeGunner = false;
+    private HumveeController assignedHumvee;
+    private Transform humveeCurrentTarget;
+    private float humveeFireCooldown = 0f;
+    private float humveeScanTimer = 0f;
+    private const float HUMVEE_ENGAGE_RANGE = 150f;  // Detect enemies at this range
+    private const float HUMVEE_FIRE_RANGE = 120f;    // Open fire at this range
+
+    // Humvee stuck detection
+    private Vector3 humveeLastPosition;
+    private float humveeStuckTimer = 0f;
+    private float humveeReverseTimer = 0f;
+    private float humveeRandomTurnDir = 1f;
 
     private Vector3 heliTargetPosition = Vector3.zero;
     private float heliTargetAltitude = 20f;
@@ -529,7 +580,7 @@ public class AIController : MonoBehaviour
         // Randomize personality
         RandomizePersonality();
 
-        allCapturePoints.AddRange(FindObjectsOfType<CapturePoint>());
+        allCapturePoints.AddRange(FindObjectsByType<CapturePoint>(FindObjectsSortMode.None));
 
         // Team-dependent initialization is done in InitializeTeam() after AISpawner sets the team
         lastPosition = transform.position;
@@ -543,7 +594,7 @@ public class AIController : MonoBehaviour
         // Find capture points if not already found (Start() may not have run yet)
         if (allCapturePoints.Count == 0)
         {
-            allCapturePoints.AddRange(FindObjectsOfType<CapturePoint>());
+            allCapturePoints.AddRange(FindObjectsByType<CapturePoint>(FindObjectsSortMode.None));
         }
 
         // Make sure we're on the NavMesh
@@ -710,24 +761,53 @@ public class AIController : MonoBehaviour
 
     void SetupTeamSkin()
     {
-        // First, disable ALL character models
+        Debug.Log($"[AI Skin] SetupTeamSkin called for {gameObject.name}, team={team}");
+
+        // Pre-load attachments from Resources
+        LoadAttachmentsFromResources();
+
+        // First, disable ALL character models (but not attachments)
         Transform[] allChildren = GetComponentsInChildren<Transform>(true);
         foreach (Transform child in allChildren)
         {
-            if (child.name.StartsWith("SM_Chr_"))
+            // Only disable base character models, not attachments
+            if (child.name.StartsWith("SM_Chr_") && !child.name.Contains("Attach"))
             {
                 child.gameObject.SetActive(false);
             }
         }
 
-        // Choose which skins to use based on team
-        string[] skinNames = team == Team.Phantom ? phantomSkinNames : havocSkinNames;
+        // Choose which skins to use based on team - always use full list
+        string[] skinNames;
+        if (team == Team.Phantom)
+        {
+            skinNames = new string[] {
+                "SM_Chr_Soldier_Male_01", "SM_Chr_Soldier_Male_02",
+                "SM_Chr_Soldier_Female_01", "SM_Chr_Soldier_Female_02",
+                "SM_Chr_Contractor_Male_01", "SM_Chr_Contractor_Male_02", "SM_Chr_Contractor_Female_01",
+                "SM_Chr_Ghillie_Male_01", "SM_Chr_Pilot_Male_01", "SM_Chr_Pilot_Female_01"
+            };
+        }
+        else
+        {
+            skinNames = new string[] {
+                "SM_Chr_Insurgent_Male_01", "SM_Chr_Insurgent_Male_02", "SM_Chr_Insurgent_Male_03",
+                "SM_Chr_Insurgent_Male_04", "SM_Chr_Insurgent_Male_05",
+                "SM_Chr_Insurgent_Female_01", "SM_Chr_Insurgent_Female_02"
+            };
+        }
 
         // Pick a random skin from the team's options
-        bool skinFound = false;
+        // Use spawn counter for guaranteed unique random per AI
+        spawnCounter++;
+        Transform activeCharacter = null;
         if (skinNames.Length > 0)
         {
-            string chosenSkin = skinNames[Random.Range(0, skinNames.Length)];
+            int seed = spawnCounter * 7919 + gameObject.GetInstanceID();
+            var rng = new System.Random(seed);
+            int skinIndex = rng.Next(skinNames.Length);
+            string chosenSkin = skinNames[skinIndex];
+            Debug.Log($"[AI Skin] {gameObject.name}: counter={spawnCounter}, index={skinIndex}/{skinNames.Length}, skin={chosenSkin}");
 
             // Find and enable the chosen skin
             foreach (Transform child in allChildren)
@@ -735,26 +815,263 @@ public class AIController : MonoBehaviour
                 if (child.name == chosenSkin)
                 {
                     child.gameObject.SetActive(true);
-                    skinFound = true;
+                    activeCharacter = child;
+                    break;
+                }
+            }
+
+            if (activeCharacter == null)
+            {
+                // List available skins for debugging
+                var available = new System.Collections.Generic.List<string>();
+                foreach (Transform child in allChildren)
+                {
+                    if (child.name.StartsWith("SM_Chr_") && !child.name.Contains("Attach"))
+                        available.Add(child.name);
+                }
+                Debug.LogWarning($"[AI Skin] {gameObject.name}: '{chosenSkin}' not found! Available: {string.Join(", ", available)}");
+            }
+        }
+
+        // FALLBACK: If we couldn't find the chosen skin, enable the FIRST character model we find
+        if (activeCharacter == null)
+        {
+            foreach (Transform child in allChildren)
+            {
+                // Only consider base characters, not attachments
+                if (child.name.StartsWith("SM_Chr_") && !child.name.Contains("Attach"))
+                {
+                    child.gameObject.SetActive(true);
+                    activeCharacter = child;
                     break;
                 }
             }
         }
 
-        // FALLBACK: If we couldn't find the chosen skin, enable the FIRST character model we find
-        // This prevents the AI from being completely invisible
-        if (!skinFound)
+        // Apply random attachments
+        if (activeCharacter != null)
         {
-            foreach (Transform child in allChildren)
+            ApplyRandomAttachments(activeCharacter);
+        }
+    }
+
+    // Static cached attachment prefabs loaded from Resources
+    private static GameObject[] cachedHeadgear;
+    private static GameObject[] cachedFacewear;
+    private static GameObject[] cachedBackpacks;
+    private static bool attachmentsLoaded = false;
+    private static int spawnCounter = 0;
+
+    // Reset static variables when entering play mode (editor only)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics()
+    {
+        cachedHeadgear = null;
+        cachedFacewear = null;
+        cachedBackpacks = null;
+        attachmentsLoaded = false;
+        spawnCounter = 0;
+    }
+
+    void LoadAttachmentsFromResources()
+    {
+        Debug.Log($"[AI Attachments] LoadAttachmentsFromResources called. attachmentsLoaded={attachmentsLoaded}, cachedHeadgear null={cachedHeadgear == null}, length={cachedHeadgear?.Length ?? -1}");
+
+        // Check if already loaded and valid
+        if (attachmentsLoaded && cachedHeadgear != null && cachedHeadgear.Length > 0)
+        {
+            Debug.Log($"[AI Attachments] Already loaded, skipping. Count={cachedHeadgear.Length}");
+            return;
+        }
+
+        attachmentsLoaded = true;
+
+        // Load specific attachment prefabs by name from Resources/Attachments
+        string[] headgearNames = {
+            "SM_Chr_Attach_Helmet_01", "SM_Chr_Attach_Helmet_02", "SM_Chr_Attach_Helmet_03",
+            "SM_Chr_Attach_Helmet_04", "SM_Chr_Attach_Helmet_05", "SM_Chr_Attach_Helmet_06",
+            "SM_Chr_Attach_Helmet_07", "SM_Chr_Attach_Helmet_08", "SM_Chr_Attach_Helmet_09",
+            "SM_Chr_Attach_Helmet_10", "SM_Chr_Attach_Helmet_11",
+            "SM_Char_Attach_Beret_01", "SM_Chr_Attach_Beanie_01", "SM_Chr_Attach_CowboyHat_01",
+            "SM_Chr_Attach_Hair_Male_01", "SM_Chr_Attach_Hair_Male_02", "SM_Chr_Attach_Hair_Male_03",
+            "SM_Chr_Attach_Hair_Female_01", "SM_Chr_Attach_Hair_Female_02"
+        };
+
+        string[] facewearNames = {
+            "SM_Chr_Attach_Beard_01", "SM_Chr_Attach_Beard_02", "SM_Chr_Attach_Beard_03",
+            "SM_Chr_Attach_Beard_04", "SM_Chr_Attach_Beard_05", "SM_Chr_Attach_Beard_06",
+            "SM_Chr_Attach_Glasses_01", "SM_Chr_Attach_Goggles_01", "SM_Chr_Attach_SunGlasses_01"
+        };
+
+        string[] backpackNames = {
+            "SM_Chr_Attach_Backpack_01", "SM_Chr_Attach_Backpack_02",
+            "SM_Chr_Attach_Pouch_01", "SM_Chr_Attach_Pouch_02", "SM_Chr_Attach_Pouch_03"
+        };
+
+        var headgearList = new System.Collections.Generic.List<GameObject>();
+        var facewearList = new System.Collections.Generic.List<GameObject>();
+        var backpackList = new System.Collections.Generic.List<GameObject>();
+
+        foreach (var name in headgearNames)
+        {
+            var prefab = Resources.Load<GameObject>($"Attachments/{name}");
+            if (prefab != null) headgearList.Add(prefab);
+        }
+
+        foreach (var name in facewearNames)
+        {
+            var prefab = Resources.Load<GameObject>($"Attachments/{name}");
+            if (prefab != null) facewearList.Add(prefab);
+        }
+
+        foreach (var name in backpackNames)
+        {
+            var prefab = Resources.Load<GameObject>($"Attachments/{name}");
+            if (prefab != null) backpackList.Add(prefab);
+        }
+
+        cachedHeadgear = headgearList.ToArray();
+        cachedFacewear = facewearList.ToArray();
+        cachedBackpacks = backpackList.ToArray();
+        Debug.Log($"[AI Attachments] Loaded: {cachedHeadgear.Length} headgear, {cachedFacewear.Length} facewear, {cachedBackpacks.Length} backpacks");
+    }
+
+    void ApplyRandomAttachments(Transform character)
+    {
+        // Load from Resources if needed
+        LoadAttachmentsFromResources();
+
+        // Use arrays from inspector if set, otherwise use cached from Resources
+        GameObject[] headgear = (headgearPrefabs != null && headgearPrefabs.Length > 0) ? headgearPrefabs : cachedHeadgear;
+        GameObject[] facewear = (facewearPrefabs != null && facewearPrefabs.Length > 0) ? facewearPrefabs : cachedFacewear;
+        GameObject[] backpacks = (backpackPrefabs != null && backpackPrefabs.Length > 0) ? backpackPrefabs : cachedBackpacks;
+
+        // Use spawn counter for guaranteed unique random per AI
+        spawnCounter++;
+        int seed = spawnCounter * 31337 + gameObject.GetInstanceID();
+        var rng = new System.Random(seed);
+
+        // Find attachment points - search ALL children including inactive
+        Transform headPoint = null, facePoint = null, backPoint = null;
+        var transforms = character.GetComponentsInChildren<Transform>(true);
+
+        Debug.Log($"[AI Attachments] {gameObject.name}: Searching {transforms.Length} transforms in {character.name}");
+
+        // Track original attachments to hide when we add our own
+        var originalHeadgear = new System.Collections.Generic.List<GameObject>();
+        var originalFacewear = new System.Collections.Generic.List<GameObject>();
+        var originalBackpacks = new System.Collections.Generic.List<GameObject>();
+
+        foreach (var t in transforms)
+        {
+            string tName = t.name.ToLower();
+
+            // Categorize original attachments
+            if (tName.Contains("attach_") || tName.Contains("attach "))
             {
-                if (child.name.StartsWith("SM_Chr_"))
+                if (tName.Contains("helmet") || tName.Contains("hat") || tName.Contains("hair") ||
+                    tName.Contains("beret") || tName.Contains("beanie") || tName.Contains("cap") || tName.Contains("turban"))
                 {
-                    child.gameObject.SetActive(true);
-                    Debug.LogWarning($"{gameObject.name}: Could not find chosen skin, using fallback: {child.name}");
-                    break;
+                    originalHeadgear.Add(t.gameObject);
+                }
+                else if (tName.Contains("beard") || tName.Contains("glasses") || tName.Contains("goggles") ||
+                         tName.Contains("mask") || tName.Contains("nvg") || tName.Contains("eyepatch"))
+                {
+                    originalFacewear.Add(t.gameObject);
+                }
+                else if (tName.Contains("backpack") || tName.Contains("pouch"))
+                {
+                    originalBackpacks.Add(t.gameObject);
+                    if (backPoint == null) backPoint = t.parent;
                 }
             }
+
+            // Find bone attachment points - Synty uses "Head" bone
+            if (headPoint == null && (tName == "head" || tName.Contains("head") && !tName.Contains("headset") && !tName.Contains("attach")))
+                headPoint = t;
+            else if (facePoint == null && (tName == "neck" || tName.Contains("neck") || tName.Contains("jaw")))
+                facePoint = t;
+            else if (backPoint == null && (tName.Contains("spine") || tName.Contains("back")))
+                backPoint = t;
         }
+
+        // Fallback - search in the entire AI hierarchy for skeleton bones
+        if (headPoint == null || backPoint == null)
+        {
+            var allTransforms = GetComponentsInChildren<Transform>(true);
+            foreach (var t in allTransforms)
+            {
+                string tName = t.name.ToLower();
+                if (headPoint == null && tName == "head")
+                    headPoint = t;
+                if (backPoint == null && tName.Contains("spine"))
+                    backPoint = t;
+            }
+        }
+
+        if (facePoint == null) facePoint = headPoint;
+
+        Debug.Log($"[AI Attachments] {gameObject.name}: headPoint={headPoint?.name}, facePoint={facePoint?.name}, backPoint={backPoint?.name}");
+        Debug.Log($"[AI Attachments] {gameObject.name}: Arrays - headgear={headgear?.Length ?? 0}, facewear={facewear?.Length ?? 0}, backpacks={backpacks?.Length ?? 0}");
+
+        // Randomly apply headgear
+        double headRoll = rng.NextDouble();
+        if (headgear != null && headgear.Length > 0 && headPoint != null && headRoll < headgearChance)
+        {
+            // Hide original headgear first
+            foreach (var orig in originalHeadgear)
+                orig.SetActive(false);
+
+            int index = rng.Next(headgear.Length);
+            if (headgear[index] != null)
+            {
+                var attachment = Instantiate(headgear[index], headPoint);
+                attachment.transform.localPosition = Vector3.zero;
+                attachment.transform.localRotation = Quaternion.identity;
+            }
+        }
+
+        // Randomly apply facewear
+        double faceRoll = rng.NextDouble();
+        if (facewear != null && facewear.Length > 0 && facePoint != null && faceRoll < facewearChance)
+        {
+            // Hide original facewear first
+            foreach (var orig in originalFacewear)
+                orig.SetActive(false);
+
+            int index = rng.Next(facewear.Length);
+            if (facewear[index] != null)
+            {
+                var attachment = Instantiate(facewear[index], facePoint);
+                attachment.transform.localPosition = Vector3.zero;
+                attachment.transform.localRotation = Quaternion.identity;
+            }
+        }
+
+        // Randomly apply backpack
+        double backRoll = rng.NextDouble();
+        if (backpacks != null && backpacks.Length > 0 && backPoint != null && backRoll < backpackChance)
+        {
+            // Hide original backpacks first
+            foreach (var orig in originalBackpacks)
+                orig.SetActive(false);
+
+            int index = rng.Next(backpacks.Length);
+            if (backpacks[index] != null)
+            {
+                var attachment = Instantiate(backpacks[index], backPoint);
+                attachment.transform.localPosition = Vector3.zero;
+                attachment.transform.localRotation = Quaternion.identity;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set update throttle interval for performance culling
+    /// </summary>
+    public void SetCullUpdateInterval(float interval)
+    {
+        cullUpdateInterval = interval;
     }
 
     void Update()
@@ -764,12 +1081,20 @@ public class AIController : MonoBehaviour
 
         if (currentState == AIState.Dead) return;
 
+        // Performance culling - throttle updates when far from player
+        if (cullUpdateInterval > 0f)
+        {
+            cullUpdateTimer -= Time.deltaTime;
+            if (cullUpdateTimer > 0f) return;
+            cullUpdateTimer = cullUpdateInterval;
+        }
+
         // Update global cache once per second (needed for targeting)
         globalCacheTimer -= Time.deltaTime;
         if (globalCacheTimer <= 0f)
         {
-            cachedPlayers = FindObjectsOfType<FPSControllerPhoton>();
-            cachedAIs = FindObjectsOfType<AIController>();
+            cachedPlayers = FindObjectsByType<FPSControllerPhoton>(FindObjectsSortMode.None);
+            cachedAIs = FindObjectsByType<AIController>(FindObjectsSortMode.None);
             globalCacheTimer = 1f;
         }
 
@@ -802,6 +1127,27 @@ public class AIController : MonoBehaviour
         if (currentState == AIState.TankPassenger)
         {
             UpdateTankPassengerBehavior();
+            return;
+        }
+
+        // Handle Humvee driver behavior
+        if (currentState == AIState.HumveeDriver)
+        {
+            UpdateHumveeDriverBehavior();
+            return;
+        }
+
+        // Handle Humvee gunner behavior
+        if (currentState == AIState.HumveeGunner)
+        {
+            UpdateHumveeGunnerBehavior();
+            return;
+        }
+
+        // Handle Humvee passenger behavior
+        if (currentState == AIState.HumveePassenger)
+        {
+            UpdateHumveePassengerBehavior();
             return;
         }
 
@@ -2222,7 +2568,7 @@ public class AIController : MonoBehaviour
             // Fallback: just wander forward
             if (allCapturePoints.Count == 0)
             {
-                allCapturePoints.AddRange(FindObjectsOfType<CapturePoint>());
+                allCapturePoints.AddRange(FindObjectsByType<CapturePoint>(FindObjectsSortMode.None));
             }
         }
     }
@@ -2913,6 +3259,37 @@ public class AIController : MonoBehaviour
 
         float dist = Vector3.Distance(transform.position, targetEnemy.position);
 
+        // Check line of sight - can we actually hit the target?
+        Vector3 dirToTarget = (targetPos - muzzlePos).normalized;
+        float distToTarget = Vector3.Distance(muzzlePos, targetPos);
+        RaycastHit losHit;
+        bool hasLineOfSight = true;
+        Vector3 actualHitPoint = targetPos;
+
+        if (Physics.Raycast(muzzlePos, dirToTarget, out losHit, distToTarget))
+        {
+            // Check if we hit a wall/obstacle before reaching the target
+            AIController hitAI = losHit.collider.GetComponentInParent<AIController>();
+            FPSControllerPhoton hitPlayer = losHit.collider.GetComponentInParent<FPSControllerPhoton>();
+
+            // If we hit something that's not our target, we don't have line of sight
+            if (hitAI == null && hitPlayer == null)
+            {
+                hasLineOfSight = false;
+                actualHitPoint = losHit.point;
+            }
+            else if (hitAI != null && hitAI.transform != targetEnemy)
+            {
+                hasLineOfSight = false;
+                actualHitPoint = losHit.point;
+            }
+            else if (hitPlayer != null && hitPlayer.transform != targetEnemy)
+            {
+                hasLineOfSight = false;
+                actualHitPoint = losHit.point;
+            }
+        }
+
         // Play gunshot sound
         if (gunshotSound != null && audioSource != null)
         {
@@ -2923,10 +3300,17 @@ public class AIController : MonoBehaviour
         // Spawn muzzle flash
         SpawnMuzzleFlash(muzzlePos);
 
-        // Show tracer
+        // Show tracer - use actual hit point (wall or target)
         if (tracerLine != null)
         {
-            StartCoroutine(ShowTracer(muzzlePos, targetPos));
+            StartCoroutine(ShowTracer(muzzlePos, actualHitPoint));
+        }
+
+        // If we don't have line of sight, bullet hits the wall - no damage
+        if (!hasLineOfSight)
+        {
+            burstCount++;
+            return;
         }
 
         // Calculate hit chance based on multiple factors
@@ -3143,7 +3527,7 @@ public class AIController : MonoBehaviour
         }
 
         // Report to kill feed
-        KillFeedManager killFeed = FindObjectOfType<KillFeedManager>();
+        KillFeedManager killFeed = FindFirstObjectByType<KillFeedManager>();
         if (killFeed != null)
         {
             killFeed.ReportKill(killerName, victimName, killerTeam, victimTeam);
@@ -4831,7 +5215,7 @@ public class AIController : MonoBehaviour
     void PickNewHeliDestination()
     {
         // Pick a capture point or random location to fly to
-        CapturePoint[] points = FindObjectsOfType<CapturePoint>();
+        CapturePoint[] points = FindObjectsByType<CapturePoint>(FindObjectsSortMode.None);
         if (points.Length > 0)
         {
             // Prefer enemy or neutral points
@@ -5272,7 +5656,7 @@ public class AIController : MonoBehaviour
                 }
 
                 // Is there an EMERGENCY somewhere else?
-                CapturePoint[] points = FindObjectsOfType<CapturePoint>();
+                CapturePoint[] points = FindObjectsByType<CapturePoint>(FindObjectsSortMode.None);
                 foreach (var point in points)
                 {
                     if (point.isContested && point.owningTeam == team)
@@ -5445,8 +5829,8 @@ public class AIController : MonoBehaviour
     bool FindTroopsNeedingTransport(out Vector3 pickupPosition)
     {
         pickupPosition = Vector3.zero;
-        AIController[] allAI = FindObjectsOfType<AIController>();
-        CapturePoint[] objectives = FindObjectsOfType<CapturePoint>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
+        CapturePoint[] objectives = FindObjectsByType<CapturePoint>(FindObjectsSortMode.None);
         List<AIController> availableTroops = new List<AIController>();
 
         foreach (var ai in allAI)
@@ -5496,7 +5880,7 @@ public class AIController : MonoBehaviour
     bool FindObjectiveToAttack(out CapturePoint objective, float minDistanceFromHeli = 0f)
     {
         objective = null;
-        CapturePoint[] points = FindObjectsOfType<CapturePoint>();
+        CapturePoint[] points = FindObjectsByType<CapturePoint>(FindObjectsSortMode.None);
         Vector3 heliPos = pilotingHelicopter != null ? pilotingHelicopter.transform.position : transform.position;
 
         // First, analyze the overall battlefield situation
@@ -5654,7 +6038,7 @@ public class AIController : MonoBehaviour
         Vector3 enemyCenter = Vector3.zero;
         int enemyCount = 0;
 
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
         foreach (var ai in allAI)
         {
             if (ai.team == team) continue;
@@ -5770,7 +6154,7 @@ public class AIController : MonoBehaviour
     int CountFriendliesNearPosition(Vector3 position, float radius)
     {
         int count = 0;
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
 
         foreach (var ai in allAI)
         {
@@ -5794,7 +6178,7 @@ public class AIController : MonoBehaviour
     int CountNearbyFriendliesNeedingTransport()
     {
         int count = 1;  // Include self
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
 
         foreach (var ai in allAI)
         {
@@ -5828,7 +6212,7 @@ public class AIController : MonoBehaviour
     int CountFriendliesHeadingToPosition(Vector3 position, float radius)
     {
         int count = 0;
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
 
         foreach (var ai in allAI)
         {
@@ -5889,6 +6273,432 @@ public class AIController : MonoBehaviour
 
         // Eject virtual passengers (no physical seat)
         pilotingHelicopter.EjectAllVirtualPassengers();
+    }
+
+    // ==================== HUMVEE DRIVER/GUNNER METHODS ====================
+
+    public void AssignAsHumveeDriver(HumveeController humvee)
+    {
+        if (humvee == null) return;
+
+        isDedicatedHumveeDriver = true;
+        assignedHumvee = humvee;
+
+        EnterHumveeAsDriver(humvee);
+    }
+
+    public void AssignAsHumveeGunner(HumveeController humvee)
+    {
+        if (humvee == null) return;
+
+        isDedicatedHumveeGunner = true;
+        assignedHumvee = humvee;
+
+        EnterHumveeAsGunner(humvee);
+    }
+
+    public void EnterHumveeAsDriver(HumveeController humvee)
+    {
+        if (humvee == null)
+        {
+            Debug.LogError("[Humvee AI] EnterHumveeAsDriver called with null humvee!");
+            return;
+        }
+        if (currentState == AIState.Dead || currentState == AIState.HumveeDriver) return;
+        if (humvee.HasDriver)
+        {
+            Debug.LogWarning($"[Humvee AI] {name} tried to enter humvee but it already has a driver!");
+            return;
+        }
+
+        Debug.Log($"[Humvee AI] {name} entering humvee {humvee.name} as driver - currentState will be HumveeDriver");
+
+        drivingHumvee = humvee;
+        currentState = AIState.HumveeDriver;
+
+        // Disable NavMeshAgent
+        if (agent != null)
+            agent.enabled = false;
+
+        // Tell humvee we're the driver
+        humvee.SetAIDriver(this);
+
+        // Hide model
+        SetModelVisible(false);
+
+        // Disable collider
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
+        // Parent to humvee
+        transform.SetParent(humvee.transform);
+        if (humvee.driverSeat != null)
+            transform.localPosition = humvee.driverSeat.localPosition;
+        else
+            transform.localPosition = new Vector3(-0.5f, 1f, 0.5f);
+    }
+
+    public void EnterHumveeAsGunner(HumveeController humvee)
+    {
+        if (humvee == null) return;
+        if (currentState == AIState.Dead || currentState == AIState.HumveeGunner) return;
+        if (humvee.HasGunner) return;
+
+        Debug.Log($"[Humvee AI] {name} entering humvee as gunner");
+
+        gunningHumvee = humvee;
+        currentState = AIState.HumveeGunner;
+
+        // Disable NavMeshAgent
+        if (agent != null)
+            agent.enabled = false;
+
+        // Tell humvee we're the gunner
+        humvee.SetAIGunner(this);
+
+        // Hide model
+        SetModelVisible(false);
+
+        // Disable collider
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
+        // Parent to humvee
+        transform.SetParent(humvee.transform);
+        if (humvee.gunnerSeat != null)
+            transform.localPosition = humvee.gunnerSeat.localPosition;
+        else
+            transform.localPosition = new Vector3(0f, 2f, -0.5f);
+    }
+
+    public void SetAsVehiclePassenger(GameObject vehicle)
+    {
+        // Generic vehicle passenger state
+        if (vehicle.GetComponent<HumveeController>() != null)
+        {
+            currentState = AIState.HumveePassenger;
+        }
+        else if (vehicle.GetComponent<TankController>() != null)
+        {
+            currentState = AIState.TankPassenger;
+        }
+
+        // Disable NavMeshAgent
+        if (agent != null)
+            agent.enabled = false;
+
+        // Hide model
+        SetModelVisible(false);
+
+        // Disable collider
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+    }
+
+    public void ExitVehicle()
+    {
+        // Handle exiting any vehicle type
+        if (currentState == AIState.HumveeDriver && drivingHumvee != null)
+        {
+            ExitHumveeAsDriver();
+        }
+        else if (currentState == AIState.HumveeGunner && gunningHumvee != null)
+        {
+            ExitHumveeAsGunner();
+        }
+        else if (currentState == AIState.TankDriver && drivingTank != null)
+        {
+            ExitTankAsDriver();
+        }
+    }
+
+    public void ExitHumveeAsDriver()
+    {
+        if (drivingHumvee == null) return;
+
+        HumveeController humvee = drivingHumvee;
+        humvee.ClearAIDriver();
+        drivingHumvee = null;
+
+        // Unparent
+        transform.SetParent(null);
+
+        // Find exit position
+        Vector3 exitPos = humvee.transform.position + humvee.transform.right * 3f;
+        exitPos.y = humvee.transform.position.y + 1f;
+
+        if (Physics.Raycast(exitPos + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 15f))
+        {
+            exitPos = hit.point + Vector3.up * 0.5f;
+        }
+
+        transform.position = exitPos;
+
+        // Re-enable
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = true;
+        SetModelVisible(true);
+
+        if (agent != null)
+        {
+            agent.enabled = true;
+            agent.Warp(transform.position);
+        }
+
+        currentState = AIState.Idle;
+        isDedicatedHumveeDriver = false;
+        assignedHumvee = null;
+
+        Debug.Log($"[Humvee AI] {name} exited humvee as driver");
+    }
+
+    public void ExitHumveeAsGunner()
+    {
+        if (gunningHumvee == null) return;
+
+        HumveeController humvee = gunningHumvee;
+        humvee.ClearAIGunner();
+        gunningHumvee = null;
+
+        transform.SetParent(null);
+
+        Vector3 exitPos = humvee.transform.position - humvee.transform.right * 3f;
+        exitPos.y = humvee.transform.position.y + 1f;
+
+        if (Physics.Raycast(exitPos + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 15f))
+        {
+            exitPos = hit.point + Vector3.up * 0.5f;
+        }
+
+        transform.position = exitPos;
+
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = true;
+        SetModelVisible(true);
+
+        if (agent != null)
+        {
+            agent.enabled = true;
+            agent.Warp(transform.position);
+        }
+
+        currentState = AIState.Idle;
+        isDedicatedHumveeGunner = false;
+        assignedHumvee = null;
+
+        Debug.Log($"[Humvee AI] {name} exited humvee as gunner");
+    }
+
+    void UpdateHumveeDriverBehavior()
+    {
+        // Check if humvee destroyed
+        if (drivingHumvee == null || drivingHumvee.isDestroyed)
+        {
+            ExitHumveeAsDriver();
+            return;
+        }
+
+        // Keep AI at humvee position
+        transform.position = drivingHumvee.transform.position;
+
+        // Use waypoint navigation if available
+        if (drivingHumvee.HasNavigation && TankWaypoint.AllWaypoints.Count > 0)
+        {
+            // Navigation handles everything
+            return;
+        }
+
+        // Fallback: Drive toward objectives
+        float moveInput = 1f;
+        float turnInput = 0f;
+
+        // Find nearest capture point
+        CapturePoint targetPoint = FindNearestEnemyOrNeutralPoint();
+
+        if (targetPoint != null)
+        {
+            // Calculate turn needed
+            Vector3 localTarget = drivingHumvee.transform.InverseTransformPoint(targetPoint.transform.position);
+            float angleToTarget = Mathf.Atan2(localTarget.x, localTarget.z) * Mathf.Rad2Deg;
+
+            // Smooth steering
+            turnInput = Mathf.Clamp(angleToTarget / 45f, -1f, 1f);
+
+            // Slow down for turns
+            if (Mathf.Abs(angleToTarget) > 60f)
+            {
+                moveInput = 0.5f;
+            }
+            else if (Mathf.Abs(angleToTarget) > 30f)
+            {
+                moveInput = 0.75f;
+            }
+        }
+        else
+        {
+            // No target - drive forward
+            turnInput = Mathf.Sin(Time.time * 0.2f) * 0.1f;
+        }
+
+        drivingHumvee.SetAIDriveInput(moveInput, turnInput);
+    }
+
+    void UpdateHumveeGunnerBehavior()
+    {
+        // Check if humvee destroyed
+        if (gunningHumvee == null || gunningHumvee.isDestroyed)
+        {
+            ExitHumveeAsGunner();
+            return;
+        }
+
+        // Keep AI at humvee position
+        transform.position = gunningHumvee.transform.position;
+
+        humveeFireCooldown -= Time.deltaTime;
+        humveeScanTimer += Time.deltaTime;
+
+        // Find target
+        if (humveeCurrentTarget == null || humveeScanTimer > 2f)
+        {
+            humveeScanTimer = 0f;
+            humveeCurrentTarget = FindNearestEnemyForVehicle(gunningHumvee.transform.position, HUMVEE_ENGAGE_RANGE);
+        }
+
+        // Validate target
+        if (humveeCurrentTarget != null)
+        {
+            float dist = Vector3.Distance(gunningHumvee.transform.position, humveeCurrentTarget.position);
+            if (dist > HUMVEE_ENGAGE_RANGE || !IsHumveeTargetValid(humveeCurrentTarget))
+            {
+                humveeCurrentTarget = null;
+            }
+        }
+
+        float turretYaw = 0f;
+        float turretPitch = 0f;
+        bool shouldFire = false;
+
+        if (humveeCurrentTarget != null)
+        {
+            // Aim at target
+            Vector3 targetPos = humveeCurrentTarget.position + Vector3.up * 1f;
+            Vector3 localTarget = gunningHumvee.transform.InverseTransformPoint(targetPos);
+
+            turretYaw = Mathf.Atan2(localTarget.x, localTarget.z) * Mathf.Rad2Deg;
+
+            // Calculate pitch
+            Vector3 toTarget = targetPos - (gunningHumvee.turret != null ? gunningHumvee.turret.position : gunningHumvee.transform.position);
+            float horizontalDist = new Vector2(toTarget.x, toTarget.z).magnitude;
+            turretPitch = Mathf.Atan2(toTarget.y, horizontalDist) * Mathf.Rad2Deg;
+
+            // Fire if on target and in range
+            float dist = Vector3.Distance(gunningHumvee.transform.position, humveeCurrentTarget.position);
+            if (Mathf.Abs(turretYaw) < 30f && dist < HUMVEE_FIRE_RANGE && humveeFireCooldown <= 0f)
+            {
+                // Check line of sight
+                Vector3 origin = gunningHumvee.turret != null ? gunningHumvee.turret.position : gunningHumvee.transform.position + Vector3.up * 2f;
+                if (!Physics.Linecast(origin, targetPos, ~(1 << LayerMask.NameToLayer("Player") | 1 << LayerMask.NameToLayer("AI"))))
+                {
+                    shouldFire = true;
+                    humveeFireCooldown = 0.15f; // Burst fire
+                }
+            }
+        }
+        else
+        {
+            // Scan for threats - sweep turret
+            float scanAngle = Mathf.Sin(Time.time * 1.5f) * 90f;
+            turretYaw = scanAngle;
+        }
+
+        gunningHumvee.SetAITurretInput(turretYaw, turretPitch, shouldFire);
+    }
+
+    void UpdateHumveePassengerBehavior()
+    {
+        // Passengers just ride along - exit handled by vehicle destruction
+        // Could add shooting from vehicle in future
+    }
+
+    Transform FindNearestEnemyForVehicle(Vector3 fromPosition, float maxRange)
+    {
+        Transform nearest = null;
+        float nearestDist = maxRange;
+
+        // Check AI
+        if (cachedAIs != null)
+        {
+            foreach (var ai in cachedAIs)
+            {
+                if (ai == null || ai == this) continue;
+                if (ai.team == team) continue;
+                if (ai.currentState == AIState.Dead) continue;
+
+                float dist = Vector3.Distance(fromPosition, ai.transform.position);
+                if (dist < nearestDist)
+                {
+                    nearestDist = dist;
+                    nearest = ai.transform;
+                }
+            }
+        }
+
+        // Check players
+        if (cachedPlayers != null)
+        {
+            foreach (var player in cachedPlayers)
+            {
+                if (player == null) continue;
+                if (player.playerTeam == team) continue;
+                if (player.isDead) continue;
+
+                float dist = Vector3.Distance(fromPosition, player.transform.position);
+                if (dist < nearestDist)
+                {
+                    nearestDist = dist;
+                    nearest = player.transform;
+                }
+            }
+        }
+
+        return nearest;
+    }
+
+    bool IsHumveeTargetValid(Transform target)
+    {
+        if (target == null) return false;
+
+        var player = target.GetComponent<FPSControllerPhoton>();
+        if (player != null)
+            return !player.isDead && player.playerTeam != team;
+
+        var ai = target.GetComponent<AIController>();
+        if (ai != null)
+            return ai.currentState != AIState.Dead && ai.team != team;
+
+        return false;
+    }
+
+    CapturePoint FindNearestEnemyOrNeutralPoint()
+    {
+        CapturePoint nearest = null;
+        float nearestDist = float.MaxValue;
+
+        foreach (var point in allCapturePoints)
+        {
+            if (point == null) continue;
+            if (point.owningTeam == team) continue; // Skip our own
+
+            float dist = Vector3.Distance(transform.position, point.transform.position);
+            if (dist < nearestDist)
+            {
+                nearestDist = dist;
+                nearest = point;
+            }
+        }
+
+        return nearest;
     }
 
     // ==================== JET PILOT METHODS ====================
@@ -6772,7 +7582,7 @@ public class AIController : MonoBehaviour
     bool FindJetAirTarget()
     {
         // Look for enemy helicopters or other jets
-        HelicopterController[] helis = FindObjectsOfType<HelicopterController>();
+        HelicopterController[] helis = FindObjectsByType<HelicopterController>(FindObjectsSortMode.None);
 
         foreach (var heli in helis)
         {
@@ -7199,7 +8009,7 @@ public class AIController : MonoBehaviour
         if (currentState == AIState.BoardingHelicopter) return;  // Already boarding
         if (currentHelicopter != null) return;
 
-        HelicopterController[] helicopters = FindObjectsOfType<HelicopterController>();
+        HelicopterController[] helicopters = FindObjectsByType<HelicopterController>(FindObjectsSortMode.None);
         HelicopterController bestHeli = null;
         HelicopterSeat bestSeat = null;
         float closestDist = HELI_BOARDING_RANGE;
@@ -7325,7 +8135,7 @@ public class AIController : MonoBehaviour
     {
         if (currentState != AIState.Idle && currentState != AIState.MovingToPoint) return;
 
-        HelicopterController[] helicopters = FindObjectsOfType<HelicopterController>();
+        HelicopterController[] helicopters = FindObjectsByType<HelicopterController>(FindObjectsSortMode.None);
         float closestDist = 30f;
         HelicopterController closestHeli = null;
 
@@ -8003,7 +8813,7 @@ public class AIController : MonoBehaviour
         }
 
         // Check for enemy tanks
-        TankController[] tanks = FindObjectsOfType<TankController>();
+        TankController[] tanks = FindObjectsByType<TankController>(FindObjectsSortMode.None);
         foreach (var tank in tanks)
         {
             if (tank == null || tank == drivingTank || tank.isDestroyed) continue;
@@ -8023,7 +8833,7 @@ public class AIController : MonoBehaviour
         }
 
         // Check for enemy helicopters
-        HelicopterController[] helis = FindObjectsOfType<HelicopterController>();
+        HelicopterController[] helis = FindObjectsByType<HelicopterController>(FindObjectsSortMode.None);
         foreach (var heli in helis)
         {
             if (heli == null || heli.isDestroyed) continue;
@@ -9609,7 +10419,7 @@ public class AIController : MonoBehaviour
     {
         if (!isDedicatedPilot && !isDedicatedTankDriver) return; // Only dedicated drivers seek tanks
 
-        TankController[] tanks = FindObjectsOfType<TankController>();
+        TankController[] tanks = FindObjectsByType<TankController>(FindObjectsSortMode.None);
         float closestDist = 30f;
         TankController closestTank = null;
 
@@ -10280,7 +11090,7 @@ public class AIController : MonoBehaviour
         if (currentState == AIState.TankDriver || currentState == AIState.TankPassenger) return;
         if (currentState == AIState.HeliPilot || currentState == AIState.HeliGunner || currentState == AIState.HeliPassenger) return;
 
-        TankController[] tanks = FindObjectsOfType<TankController>();
+        TankController[] tanks = FindObjectsByType<TankController>(FindObjectsSortMode.None);
         TankController bestTank = null;
         float bestDist = 20f;  // Max boarding distance
 

@@ -81,7 +81,9 @@ public class TankWaypointEditorWindow : EditorWindow
     // Settings
     private float waypointRadius = 4f;
     private Team waypointTeam = Team.None;
-    private float autoConnectDistance = 80f;
+    #pragma warning disable CS0414
+    private float autoConnectDistance = 80f;  // Used in Inspector
+    #pragma warning restore CS0414
     private bool autoConnect = true;
     private bool snapToGround = true;
 
@@ -221,7 +223,7 @@ public class TankWaypointEditorWindow : EditorWindow
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("All Waypoints", EditorStyles.boldLabel);
 
-        TankWaypoint[] all = FindObjectsOfType<TankWaypoint>();
+        TankWaypoint[] all = FindObjectsByType<TankWaypoint>(FindObjectsSortMode.None);
         EditorGUILayout.LabelField($"Total: {all.Length} waypoints");
 
         if (GUILayout.Button("Auto-Connect All"))
@@ -369,7 +371,7 @@ public class TankWaypointEditorWindow : EditorWindow
 
     void DrawAllWaypoints()
     {
-        TankWaypoint[] waypoints = FindObjectsOfType<TankWaypoint>();
+        TankWaypoint[] waypoints = FindObjectsByType<TankWaypoint>(FindObjectsSortMode.None);
         TankWaypoint[] selected = Selection.GetFiltered<TankWaypoint>(SelectionMode.TopLevel);
         HashSet<TankWaypoint> selectedSet = new HashSet<TankWaypoint>(selected);
 
@@ -461,7 +463,7 @@ public class TankWaypointEditorWindow : EditorWindow
 
     TankWaypoint GetWaypointAtRay(Ray ray)
     {
-        TankWaypoint[] waypoints = FindObjectsOfType<TankWaypoint>();
+        TankWaypoint[] waypoints = FindObjectsByType<TankWaypoint>(FindObjectsSortMode.None);
         TankWaypoint closest = null;
         float closestDist = float.MaxValue;
 
@@ -524,7 +526,7 @@ public class TankWaypointEditorWindow : EditorWindow
         if (waypoint == null) return;
 
         // Remove from all connections first
-        TankWaypoint[] all = FindObjectsOfType<TankWaypoint>();
+        TankWaypoint[] all = FindObjectsByType<TankWaypoint>(FindObjectsSortMode.None);
         foreach (var wp in all)
         {
             if (wp != null && wp != waypoint && wp.connections.Contains(waypoint))

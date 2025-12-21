@@ -197,7 +197,7 @@ public class DestructibleSetup : EditorWindow
         foundObjects.Clear();
 
         // Find all GameObjects in scene
-        GameObject[] allObjects = FindObjectsOfType<GameObject>();
+        GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
         int totalScanned = 0;
         int noCollider = 0;
         int noRenderer = 0;

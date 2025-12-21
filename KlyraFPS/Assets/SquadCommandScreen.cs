@@ -137,7 +137,7 @@ public class SquadCommandScreen : MonoBehaviour
         }
 
         // Setup overhead view
-        allPoints = FindObjectsOfType<CapturePoint>();
+        allPoints = FindObjectsByType<CapturePoint>(FindObjectsSortMode.None);
         Vector3 mapCenter = CalculateMapCenter();
         currentZoom = mapHeight;
         cameraYaw = 0f;
@@ -182,7 +182,7 @@ public class SquadCommandScreen : MonoBehaviour
         squadMembers.Clear();
         if (player == null) return;
 
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
         foreach (var ai in allAI)
         {
             if (ai.IsInSquad() && ai.GetPlayerSquadLeader() == player)
@@ -879,7 +879,7 @@ public class SquadCommandScreen : MonoBehaviour
     {
         if (playerCamera == null) return;
 
-        HelicopterController[] helis = FindObjectsOfType<HelicopterController>();
+        HelicopterController[] helis = FindObjectsByType<HelicopterController>(FindObjectsSortMode.None);
 
         foreach (var heli in helis)
         {
@@ -1027,7 +1027,7 @@ public class SquadCommandScreen : MonoBehaviour
         if (playerCamera == null || player == null) return;
 
         // Draw other friendly AI (not in squad)
-        AIController[] allAI = FindObjectsOfType<AIController>();
+        AIController[] allAI = FindObjectsByType<AIController>(FindObjectsSortMode.None);
         foreach (var ai in allAI)
         {
             if (ai == null || ai.isDead) continue;
@@ -1053,7 +1053,7 @@ public class SquadCommandScreen : MonoBehaviour
         }
 
         // Draw other friendly players
-        FPSControllerPhoton[] allPlayers = FindObjectsOfType<FPSControllerPhoton>();
+        FPSControllerPhoton[] allPlayers = FindObjectsByType<FPSControllerPhoton>(FindObjectsSortMode.None);
         foreach (var otherPlayer in allPlayers)
         {
             if (otherPlayer == null || otherPlayer == player || otherPlayer.isDead) continue;

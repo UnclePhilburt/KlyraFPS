@@ -164,8 +164,8 @@ public class CapturePoint : MonoBehaviourPunCallbacks, IPunObservable
         playerCacheTimer -= Time.deltaTime;
         if (playerCacheTimer <= 0f || cachedPlayers == null)
         {
-            cachedPlayers = FindObjectsOfType<FPSControllerPhoton>();
-            cachedAIs = FindObjectsOfType<AIController>();
+            cachedPlayers = FindObjectsByType<FPSControllerPhoton>(FindObjectsSortMode.None);
+            cachedAIs = FindObjectsByType<AIController>(FindObjectsSortMode.None);
             playerCacheTimer = 1f;
         }
 
