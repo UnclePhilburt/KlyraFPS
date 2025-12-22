@@ -6,8 +6,8 @@ _Recovery/
 [Bb]uild/
 [Bb]uilds/
 !serverbuild/
-# WebGL builds - deploy to Cloudflare Pages instead
-docs/Build/
+!docs/Build/
+# WebGL builds - tracked with Git LFS for Cloudflare Pages
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
 
@@ -92,8 +92,5 @@ WebGL/
 # Old project folders
 My project/
 
-# Large build files
-docs/Build/docs.data
-docs/Build/docs.wasm
-docs/Build/*.data
-docs/Build/*.wasm
+# Large build files - now tracked with Git LFS
+# docs/Build/*.unityweb tracked via .gitattributes
