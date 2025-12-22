@@ -2660,8 +2660,14 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         // Small delay before starting load
         yield return new WaitForSeconds(0.3f);
 
-        // Start loading the game scene
-        PhotonNetwork.LoadLevel(gameSceneName);
+        // Pause message queue during scene load to prevent errors
+        PhotonNetwork.IsMessageQueueRunning = false;
+
+        // Only Master Client loads the level (AutomaticallySyncScene will sync others)
+        if (PhotonNetwork.IsMasterClient)
+        {
+            PhotonNetwork.LoadLevel(gameSceneName);
+        }
 
         // Wait for Photon to start the level load
         yield return new WaitForSeconds(0.1f);
@@ -2676,6 +2682,9 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         // Loading complete - ensure bar is full
         loadProgress = 1f;
         yield return new WaitForSeconds(0.2f);
+
+        // Re-enable message queue after scene load
+        PhotonNetwork.IsMessageQueueRunning = true;
 
         // Hide loading panel (in case scene transition hasn't destroyed us yet)
         if (loadingGroup != null)
