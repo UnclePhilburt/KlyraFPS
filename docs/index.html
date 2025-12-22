@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KLYRA</title>
+    <script>
+        // Redirect fps.klyra.lol to the game
+        if (window.location.hostname === 'fps.klyra.lol') {
+            window.location.replace('/game.html');
+        }
+    </script>
     <style>
         * {
             margin: 0;
