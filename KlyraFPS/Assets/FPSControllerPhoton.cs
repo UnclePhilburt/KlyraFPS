@@ -469,6 +469,7 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             playerCamera.clearFlags = templateCam.clearFlags;
             playerCamera.backgroundColor = templateCam.backgroundColor;
             playerCamera.cullingMask = templateCam.cullingMask;
+            Debug.Log($"[FPSControllerPhoton] Copied camera settings from {templateCam.name}");
 
             // Disable the scene camera if it's still active
             if (templateCam.gameObject.activeSelf)
@@ -478,9 +479,20 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
         else
         {
-            // Fallback: use solid color (dark gray) instead of skybox
-            playerCamera.clearFlags = CameraClearFlags.SolidColor;
-            playerCamera.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 1f);
+            Debug.LogWarning("[FPSControllerPhoton] No template camera found, using fallback settings");
+
+            // Check if scene has a skybox
+            if (RenderSettings.skybox != null)
+            {
+                playerCamera.clearFlags = CameraClearFlags.Skybox;
+                Debug.Log("[FPSControllerPhoton] Using skybox from RenderSettings");
+            }
+            else
+            {
+                // Fallback: use solid color (sky blue)
+                playerCamera.clearFlags = CameraClearFlags.SolidColor;
+                playerCamera.backgroundColor = new Color(0.5f, 0.7f, 1f, 1f);
+            }
             playerCamera.cullingMask = -1; // Everything
         }
 
