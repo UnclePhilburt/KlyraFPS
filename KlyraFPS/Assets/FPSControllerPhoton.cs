@@ -433,39 +433,53 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
 
         // Setup camera
-        Camera mainCam = Camera.main;
-        if (mainCam != null)
+        // Find any camera to copy settings from (including disabled ones)
+        Camera templateCam = Camera.main;
+        if (templateCam == null)
         {
-            // Create our own camera
-            GameObject camObj = new GameObject($"PlayerCamera_{photonView.ViewID}");
-            playerCamera = camObj.AddComponent<Camera>();
-            playerCamera.fieldOfView = normalFOV;
-            playerCamera.nearClipPlane = 0.1f;
-            playerCamera.farClipPlane = 1000f;
-            cameraTransform = camObj.transform;
+            // Camera.main might be disabled, search all cameras including inactive
+            Camera[] allCams = Resources.FindObjectsOfTypeAll<Camera>();
+            foreach (Camera cam in allCams)
+            {
+                // Skip player cameras, find scene camera
+                if (!cam.gameObject.name.StartsWith("PlayerCamera_") && cam.gameObject.scene.IsValid())
+                {
+                    templateCam = cam;
+                    break;
+                }
+            }
+        }
 
-            // Add AudioListener
-            camObj.AddComponent<AudioListener>();
+        // Create our own camera
+        GameObject camObj = new GameObject($"PlayerCamera_{photonView.ViewID}");
+        playerCamera = camObj.AddComponent<Camera>();
+        playerCamera.fieldOfView = normalFOV;
+        playerCamera.nearClipPlane = 0.1f;
+        playerCamera.farClipPlane = 1000f;
+        cameraTransform = camObj.transform;
 
-            // Copy settings from main camera
-            playerCamera.clearFlags = mainCam.clearFlags;
-            playerCamera.backgroundColor = mainCam.backgroundColor;
-            playerCamera.cullingMask = mainCam.cullingMask;
+        // Add AudioListener
+        camObj.AddComponent<AudioListener>();
 
-            // Disable the scene camera completely
-            mainCam.gameObject.SetActive(false);
+        if (templateCam != null)
+        {
+            // Copy settings from template camera
+            playerCamera.clearFlags = templateCam.clearFlags;
+            playerCamera.backgroundColor = templateCam.backgroundColor;
+            playerCamera.cullingMask = templateCam.cullingMask;
+
+            // Disable the scene camera if it's still active
+            if (templateCam.gameObject.activeSelf)
+            {
+                templateCam.gameObject.SetActive(false);
+            }
         }
         else
         {
-            // No main camera, create one anyway
-            GameObject camObj = new GameObject($"PlayerCamera_{photonView.ViewID}");
-            playerCamera = camObj.AddComponent<Camera>();
-            playerCamera.fieldOfView = normalFOV;
-            playerCamera.nearClipPlane = 0.1f;
-            playerCamera.farClipPlane = 1000f;
-            playerCamera.clearFlags = CameraClearFlags.Skybox;
-            cameraTransform = camObj.transform;
-            camObj.AddComponent<AudioListener>();
+            // Fallback: use solid color (dark gray) instead of skybox
+            playerCamera.clearFlags = CameraClearFlags.SolidColor;
+            playerCamera.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 1f);
+            playerCamera.cullingMask = -1; // Everything
         }
 
         // Disable AudioListener on main camera if it exists
