@@ -695,6 +695,16 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         {
             muzzlePoint = newMuzzle;
         }
+        else
+        {
+            // Create a fallback muzzle point at the front of the weapon
+            GameObject muzzleObj = new GameObject("MuzzlePoint_Generated");
+            muzzleObj.transform.SetParent(weaponModel.transform);
+            muzzleObj.transform.localPosition = new Vector3(0, 0, 0.5f); // Front of weapon
+            muzzleObj.transform.localRotation = Quaternion.identity;
+            muzzlePoint = muzzleObj.transform;
+            Debug.Log("[FPSControllerPhoton] Created fallback muzzle point");
+        }
 
         Debug.Log($"[FPSControllerPhoton] Applied weapon model: {presetPrefab.name}, weaponTransform set, muzzle: {(muzzlePoint != null ? muzzlePoint.name : "not found")}");
     }

@@ -25,7 +25,22 @@ public class BulletTracer : MonoBehaviour
         // Use shared material to prevent memory leak
         if (sharedTracerMaterial == null)
         {
-            sharedTracerMaterial = new Material(Shader.Find("Sprites/Default"));
+            // Try multiple shaders for WebGL compatibility
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("UI/Default");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            if (shader == null) shader = Shader.Find("Legacy Shaders/Particles/Additive");
+
+            if (shader != null)
+            {
+                sharedTracerMaterial = new Material(shader);
+            }
+            else
+            {
+                // Ultimate fallback - create basic material
+                sharedTracerMaterial = new Material(Shader.Find("Hidden/InternalErrorShader"));
+                Debug.LogWarning("[BulletTracer] Could not find suitable shader, using fallback");
+            }
         }
         lineRenderer.material = sharedTracerMaterial;
         lineRenderer.startColor = new Color(1f, 0.8f, 0.2f, 1f); // Yellow/orange
