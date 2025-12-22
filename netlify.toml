@@ -1,0 +1,5 @@
+[build]
+  publish = "docs"
+
+[build.environment]
+  GIT_LFS_ENABLED = "true"
