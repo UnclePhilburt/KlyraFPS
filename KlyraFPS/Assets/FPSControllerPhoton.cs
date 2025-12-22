@@ -454,14 +454,18 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
 
         // Create our own camera
         GameObject camObj = new GameObject($"PlayerCamera_{photonView.ViewID}");
+        camObj.tag = "MainCamera";  // Set as main camera so Camera.main works
         playerCamera = camObj.AddComponent<Camera>();
         playerCamera.fieldOfView = normalFOV;
         playerCamera.nearClipPlane = 0.1f;
         playerCamera.farClipPlane = 1000f;
+        playerCamera.enabled = true;  // Explicitly enable
         cameraTransform = camObj.transform;
 
         // Add AudioListener
         camObj.AddComponent<AudioListener>();
+
+        Debug.Log($"[FPSControllerPhoton] Created player camera: {camObj.name}");
 
         if (templateCam != null)
         {

@@ -2660,13 +2660,17 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         // Small delay before starting load
         yield return new WaitForSeconds(0.3f);
 
-        // Pause message queue during scene load to prevent errors
-        PhotonNetwork.IsMessageQueueRunning = false;
-
-        // Only Master Client loads the level (AutomaticallySyncScene will sync others)
+        // Only Master Client loads the level
+        // AutomaticallySyncScene will sync the scene to other clients automatically
+        // NOTE: Do NOT manually manage IsMessageQueueRunning - LoadLevel handles it internally
         if (PhotonNetwork.IsMasterClient)
         {
+            Debug.Log($"[MainMenuUI] Master client loading level: {gameSceneName}");
             PhotonNetwork.LoadLevel(gameSceneName);
+        }
+        else
+        {
+            Debug.Log("[MainMenuUI] Non-master client waiting for AutomaticallySyncScene");
         }
 
         // Wait for Photon to start the level load
@@ -2682,9 +2686,6 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         // Loading complete - ensure bar is full
         loadProgress = 1f;
         yield return new WaitForSeconds(0.2f);
-
-        // Re-enable message queue after scene load
-        PhotonNetwork.IsMessageQueueRunning = true;
 
         // Hide loading panel (in case scene transition hasn't destroyed us yet)
         if (loadingGroup != null)
