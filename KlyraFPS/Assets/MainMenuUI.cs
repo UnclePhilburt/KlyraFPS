@@ -1450,10 +1450,15 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
 
             slotBtnComp.onClick.AddListener(() => {
                 currentEditingLoadout = idx;
+                if (weaponCustomizer == null)
+                {
+                    weaponCustomizer = WeaponCustomizer.Instance;
+                }
                 if (weaponCustomizer != null)
                 {
                     weaponCustomizer.SetCurrentLoadout(idx);
                     weaponCustomizer.SetActiveLoadout(idx); // Also set as active so it's saved for in-game use
+                    Debug.Log($"[MainMenuUI] Switched to loadout {idx}, preset: {weaponCustomizer.GetCurrentPresetIndex()}");
                 }
                 for (int j = 0; j < 5; j++)
                 {
@@ -1462,6 +1467,7 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
                     bg.color = j == idx ? accentOrange : new Color(0.2f, 0.2f, 0.25f);
                     lbl.color = j == idx ? bgDark : textWhite;
                 }
+                UpdateWeaponPresetDisplay();
                 RefreshWeaponPreview();
                 UpdateWeaponStatsDisplay();
             });
@@ -2553,6 +2559,18 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         }
 
         PlayerPrefs.SetString("PlayerName", nameInput.text);
+
+        // Save weapon loadout before loading game
+        if (weaponCustomizer == null)
+        {
+            weaponCustomizer = WeaponCustomizer.Instance;
+        }
+        if (weaponCustomizer != null)
+        {
+            weaponCustomizer.SaveAllLoadouts();
+            Debug.Log($"[MainMenuUI] Saved weapon loadout before deploy, active loadout: {weaponCustomizer.GetActiveLoadoutIndex()}");
+        }
+
         PlayerPrefs.Save();
         PhotonNetwork.NickName = nameInput.text;
 
