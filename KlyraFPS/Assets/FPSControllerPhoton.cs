@@ -438,13 +438,15 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         if (templateCam == null)
         {
             // Camera.main might be disabled, search all cameras including inactive
-            Camera[] allCams = Resources.FindObjectsOfTypeAll<Camera>();
+            // Use FindObjectsByType with IncludeInactive for better WebGL compatibility
+            Camera[] allCams = FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (Camera cam in allCams)
             {
                 // Skip player cameras, find scene camera
-                if (!cam.gameObject.name.StartsWith("PlayerCamera_") && cam.gameObject.scene.IsValid())
+                if (!cam.gameObject.name.StartsWith("PlayerCamera_"))
                 {
                     templateCam = cam;
+                    Debug.Log($"[FPSControllerPhoton] Found template camera: {cam.name}, active: {cam.gameObject.activeSelf}");
                     break;
                 }
             }
