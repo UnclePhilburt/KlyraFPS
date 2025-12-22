@@ -1969,6 +1969,12 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
             currentVehicleSeat = null;
         }
 
+        // Hide weapon model on death
+        if (weaponTransform != null)
+        {
+            weaponTransform.gameObject.SetActive(false);
+        }
+
         // Spawn death blood effect
         SpawnBloodDeath(transform.position + Vector3.up * 0.5f);
 
@@ -2153,6 +2159,12 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         // Lock cursor again
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        // Show weapon again
+        if (weaponTransform != null)
+        {
+            weaponTransform.gameObject.SetActive(true);
+        }
     }
 
     void CleanupRagdoll()
