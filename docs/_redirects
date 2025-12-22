@@ -1,7 +1,0 @@
-# FPS subdomain serves the game
-https://fps.klyra.lol/ /game.html 200
-https://fps.klyra.lol /game.html 200
-http://fps.klyra.lol/ /game.html 200
-http://fps.klyra.lol /game.html 200
-
-# Root domain serves landing page (default index.html)
