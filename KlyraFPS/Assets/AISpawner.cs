@@ -116,7 +116,9 @@ public class AISpawner : MonoBehaviour
         {
             ai.team = team;
             ai.InitializeTeam(); // Call this AFTER setting team
-            bot.name = $"AI_{team}_{(team == Team.Phantom ? phantomBots.Count : havocBots.Count)}";
+
+            int botIndex = team == Team.Phantom ? phantomBots.Count : havocBots.Count;
+            bot.name = $"AI_{team}_{botIndex}";
 
             if (team == Team.Phantom)
                 phantomBots.Add(ai);

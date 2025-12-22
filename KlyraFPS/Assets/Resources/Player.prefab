@@ -1307,6 +1307,8 @@ MonoBehaviour:
   - {fileID: 1184037836896456, guid: 437ac26317e352d4f94552d2f9569b58, type: 3}
   - {fileID: 1323065241075296, guid: 96ca23e671960964aa1d0ac6a12005cd, type: 3}
   - {fileID: 1734694007296390, guid: 451e801486561024a8ed5f96d3185a68, type: 3}
+  dogPrefabs:
+  - {fileID: 5866195906185734836, guid: e298ad7f35e8541f18678b3b196fb7df, type: 3}
 --- !u!1 &1014089305584738816
 GameObject:
   m_ObjectHideFlags: 0

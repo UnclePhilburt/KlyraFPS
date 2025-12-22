@@ -25,6 +25,10 @@ public class CharacterCustomizer : MonoBehaviour
     public TeamCustomization phantomOptions;
     public TeamCustomization havocOptions;
 
+    [Header("Dog Options")]
+    public GameObject[] dogPrefabs;
+    public string[] dogNames;
+
     [Header("Preview Settings")]
     public float rotationSpeed = 30f;
     public Vector3 previewPosition = new Vector3(100, 0, 0);
@@ -56,6 +60,8 @@ public class CharacterCustomizer : MonoBehaviour
             havocOptions.teamName = "Havoc";
         }
 
+        Debug.Log($"[CharacterCustomizer] Awake - dogPrefabs assigned: {dogPrefabs != null}, count: {(dogPrefabs != null ? dogPrefabs.Length : 0)}");
+
         LoadAllSelections();
     }
 
@@ -72,6 +78,10 @@ public class CharacterCustomizer : MonoBehaviour
         selections["Havoc_Headgear"] = PlayerPrefs.GetInt("Havoc_HeadgearIndex", -1);
         selections["Havoc_Facewear"] = PlayerPrefs.GetInt("Havoc_FacewearIndex", -1);
         selections["Havoc_Backpack"] = PlayerPrefs.GetInt("Havoc_BackpackIndex", -1);
+
+        // Load Dog selections (shared across teams, or per-team if desired)
+        selections["Phantom_Dog"] = PlayerPrefs.GetInt("Phantom_DogIndex", 0);
+        selections["Havoc_Dog"] = PlayerPrefs.GetInt("Havoc_DogIndex", 0);
     }
 
     public void SaveAllSelections()
@@ -85,6 +95,10 @@ public class CharacterCustomizer : MonoBehaviour
         PlayerPrefs.SetInt("Havoc_HeadgearIndex", GetSelection("Havoc", "Headgear"));
         PlayerPrefs.SetInt("Havoc_FacewearIndex", GetSelection("Havoc", "Facewear"));
         PlayerPrefs.SetInt("Havoc_BackpackIndex", GetSelection("Havoc", "Backpack"));
+
+        // Save dog selections
+        PlayerPrefs.SetInt("Phantom_DogIndex", GetSelection("Phantom", "Dog"));
+        PlayerPrefs.SetInt("Havoc_DogIndex", GetSelection("Havoc", "Dog"));
 
         PlayerPrefs.Save();
     }
@@ -108,6 +122,12 @@ public class CharacterCustomizer : MonoBehaviour
 
     public int GetOptionCount(string team, string category)
     {
+        // Dog is shared across teams
+        if (category == "Dog")
+        {
+            return dogPrefabs?.Length ?? 0;
+        }
+
         var options = GetTeamOptions(team);
         if (options == null) return 0;
 
@@ -124,6 +144,16 @@ public class CharacterCustomizer : MonoBehaviour
     public string GetOptionName(string team, string category, int index)
     {
         if (index < 0) return "None";
+
+        // Handle dog category separately (shared across teams)
+        if (category == "Dog")
+        {
+            if (dogNames != null && index < dogNames.Length && !string.IsNullOrEmpty(dogNames[index]))
+                return dogNames[index];
+            if (dogPrefabs != null && index < dogPrefabs.Length && dogPrefabs[index] != null)
+                return CleanDogName(dogPrefabs[index].name);
+            return "Unknown";
+        }
 
         var options = GetTeamOptions(team);
         if (options == null) return "No Team Data";
@@ -164,6 +194,14 @@ public class CharacterCustomizer : MonoBehaviour
     {
         if (index < 0) return null;
 
+        // Handle dog category separately
+        if (category == "Dog")
+        {
+            if (dogPrefabs != null && index < dogPrefabs.Length)
+                return dogPrefabs[index];
+            return null;
+        }
+
         var options = GetTeamOptions(team);
         if (options == null) return null;
 
@@ -183,6 +221,20 @@ public class CharacterCustomizer : MonoBehaviour
         return null;
     }
 
+    // Convenience method to get the currently selected dog prefab for a team
+    public GameObject GetSelectedDogPrefab(string team)
+    {
+        int index = GetSelection(team, "Dog");
+        Debug.Log($"[CharacterCustomizer] GetSelectedDogPrefab: team={team}, index={index}, dogPrefabs={dogPrefabs}, length={(dogPrefabs != null ? dogPrefabs.Length : 0)}");
+
+        if (dogPrefabs != null && dogPrefabs.Length > 0)
+        {
+            Debug.Log($"[CharacterCustomizer] First dog prefab: {(dogPrefabs[0] != null ? dogPrefabs[0].name : "NULL")}");
+        }
+
+        return GetOptionPrefab(team, "Dog", index);
+    }
+
     string CleanPrefabName(string name)
     {
         // Remove common prefixes
@@ -196,6 +248,16 @@ public class CharacterCustomizer : MonoBehaviour
         return name;
     }
 
+    string CleanDogName(string name)
+    {
+        // Remove common dog prefab prefixes
+        name = name.Replace("Unity_SK_Animals_Dog_", "");
+        name = name.Replace("_Collar", " (Collar)");
+        name = name.Replace("_01", "");
+        name = name.Replace("_", " ");
+        return name;
+    }
+
     public void CycleSelection(string team, string category, int direction)
     {
         int current = GetSelection(team, category);
@@ -203,8 +265,9 @@ public class CharacterCustomizer : MonoBehaviour
 
         if (count == 0) return;
 
-        // For non-character categories, -1 means "None"
-        int minValue = category == "Character" ? 0 : -1;
+        // For Character and Dog, always have one selected (no "None" option)
+        // For attachments, -1 means "None"
+        int minValue = (category == "Character" || category == "Dog") ? 0 : -1;
         int maxValue = count - 1;
 
         current += direction;

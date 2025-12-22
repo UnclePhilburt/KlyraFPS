@@ -267,6 +267,7 @@ GameObject:
   - component: {fileID: 1325715163}
   - component: {fileID: 1325715162}
   - component: {fileID: 1325715164}
+  - component: {fileID: 1325715165}
   m_Layer: 0
   m_Name: MainMenu
   m_TagString: Untagged
@@ -329,8 +330,9 @@ MonoBehaviour:
   - {fileID: 8300000, guid: fd64deb287eac4e4b963f28c9a396bec, type: 3}
   - {fileID: 8300000, guid: bfcbb2a136aca4de29286e3af383f1be, type: 3}
   - {fileID: 8300000, guid: 2c166234071634332b4d2f103fe2dda0, type: 3}
-  musicVolume: 0.16
+  musicVolume: 0.099
   characterCustomizer: {fileID: 0}
+  weaponCustomizer: {fileID: 1325715165}
 --- !u!4 &1325715163
 Transform:
   m_ObjectHideFlags: 0
@@ -599,9 +601,1934 @@ MonoBehaviour:
     - {fileID: 1323065241075296, guid: 96ca23e671960964aa1d0ac6a12005cd, type: 3}
     - {fileID: 1734694007296390, guid: 451e801486561024a8ed5f96d3185a68, type: 3}
     backpackNames: []
+  dogPrefabs:
+  - {fileID: 5866195906185734836, guid: e298ad7f35e8541f18678b3b196fb7df, type: 3}
+  dogNames: []
   rotationSpeed: 30
   previewPosition: {x: 100, y: 0, z: 0}
   previewRotation: {x: 0, y: 180, z: 0}
+--- !u!114 &1325715165
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1325715161}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 051de51f2c73c458485f52a686a54e26, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponCustomizer
+  weaponA:
+    platformName: Weapon_A
+    bodyPrefab: {fileID: 1170663180467770, guid: b3d6b363b8c32e94da636bc994ad4c3e, type: 3}
+    baseStats:
+      damage: 25
+      fireRate: 0.1
+      range: 100
+      accuracy: 0.9
+      recoilVertical: 2
+      recoilHorizontal: 1
+      adsSpeed: 10
+      aimFOV: 45
+      moveSpeedMultiplier: 1
+      adsMovePenalty: 0.7
+      magazineSize: 30
+      reloadTime: 2.5
+      isSilenced: 0
+      soundRange: 50
+    barrels:
+    - {fileID: 1419202060756254, guid: e4440f50296145547ac383ab68d8ae35, type: 3}
+    - {fileID: 1957214354575208, guid: 802ac6ad963c72742a2cd955386b005b, type: 3}
+    - {fileID: 1984490453099300, guid: 489f03cce540e744ba7361cd13ebb43b, type: 3}
+    - {fileID: 1088162272241624, guid: 2d25d7c13fa530a4d8a207d6232a7720, type: 3}
+    - {fileID: 1183198850611834, guid: 4229670efae75634b8b73bf5271e848e, type: 3}
+    - {fileID: 1732225824790526, guid: 5ea910ac373fcf64bb27d7ace5a8c540, type: 3}
+    barrelNames:
+    - Barrel 01
+    - Barrel 02
+    - Barrel 03
+    - Barrel 04
+    - Barrel 05
+    - Barrel 06
+    barrelModifiers:
+    - damageModifier: 0.95
+      fireRateModifier: 1
+      rangeModifier: 0.8
+      accuracyModifier: 0.9
+      recoilModifier: 1
+      adsSpeedModifier: 1.1
+      moveSpeedModifier: 1.05
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 0.98
+      fireRateModifier: 1
+      rangeModifier: 0.9
+      accuracyModifier: 0.95
+      recoilModifier: 1
+      adsSpeedModifier: 1.0500001
+      moveSpeedModifier: 1.03
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1.01
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.01
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1.04
+      fireRateModifier: 1
+      rangeModifier: 1.1
+      accuracyModifier: 1.05
+      recoilModifier: 1
+      adsSpeedModifier: 0.95000005
+      moveSpeedModifier: 0.98999995
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1.07
+      fireRateModifier: 1
+      rangeModifier: 1.1999999
+      accuracyModifier: 1.1
+      recoilModifier: 1
+      adsSpeedModifier: 0.90000004
+      moveSpeedModifier: 0.96999997
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1.1
+      fireRateModifier: 1
+      rangeModifier: 1.3
+      accuracyModifier: 1.15
+      recoilModifier: 1
+      adsSpeedModifier: 0.85
+      moveSpeedModifier: 0.95
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    grips:
+    - {fileID: 1410610304495524, guid: 31f4f92f7a2783c498ff08e2bb648dbc, type: 3}
+    - {fileID: 1576853401778360, guid: 06c8ead7ec965ca429c7d5561cec1f28, type: 3}
+    - {fileID: 1887310397710108, guid: a1cdfc1e301f4e34c80f9a0c639a59b8, type: 3}
+    gripNames:
+    - Grip 01
+    - Grip 02
+    - Grip 03
+    gripModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.85
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.90000004
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.95000005
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    handguards:
+    - {fileID: 1381529539357510, guid: 5b0fbec991e8163479f281803adb0960, type: 3}
+    - {fileID: 1647342825914552, guid: be73baefee520e9409b4c0c62664c9eb, type: 3}
+    - {fileID: 1153387628333512, guid: e332d3d5379f166439fb6693aacdad5a, type: 3}
+    - {fileID: 1068171926538044, guid: 92be43a1d7c568841b5998684b6a7f4f, type: 3}
+    - {fileID: 1969794001294526, guid: 16e7ebc06ae521d4da19eef848ee033a, type: 3}
+    - {fileID: 1962277559039998, guid: 39fa1e11522dd764cab4824e99a7cd93, type: 3}
+    handguardNames:
+    - Handguard 01
+    - Handguard 02
+    - Handguard 03
+    - Handguard 04
+    - Handguard 05
+    - Handguard 06
+    handguardModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.02
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.012
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.004
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.996
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.98800004
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.98
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    stocks:
+    - {fileID: 1419576776001516, guid: d8efb95de98f4bc498c2237e65498fc3, type: 3}
+    - {fileID: 1484999405887804, guid: a0b076f9de69fcc48819061660cca01c, type: 3}
+    - {fileID: 1528869205527834, guid: a4822f6e5cd332846b8d61298fcb0ede, type: 3}
+    - {fileID: 1867226363272598, guid: 1f390d663b1b7fa4784f4b950bec3556, type: 3}
+    - {fileID: 1879074420594772, guid: a7551154980dfc64dbd8fbef4edad23a, type: 3}
+    - {fileID: 1847564543334802, guid: 7bdf70ca6f4ec404fa792bba9b6efa5b, type: 3}
+    - {fileID: 1913820469560010, guid: 1c60166fb1387cc4e8de7c22e8fc4704, type: 3}
+    - {fileID: 1568522065114064, guid: 900774c659939cf41980e0c102089e90, type: 3}
+    stockNames:
+    - Stock 01
+    - Stock 02
+    - Stock 03
+    - Stock 04
+    - Stock 05
+    - Stock 06
+    - Stock 07
+    - Stock 08
+    stockModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1.1
+      adsSpeedModifier: 1.15
+      moveSpeedModifier: 1.05
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1.0571429
+      adsSpeedModifier: 1.1142857
+      moveSpeedModifier: 1.0357143
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1.0142857
+      adsSpeedModifier: 1.0785714
+      moveSpeedModifier: 1.0214286
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.9714286
+      adsSpeedModifier: 1.0428572
+      moveSpeedModifier: 1.0071428
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.92857146
+      adsSpeedModifier: 1.0071428
+      moveSpeedModifier: 0.9928571
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.8857143
+      adsSpeedModifier: 0.9714285
+      moveSpeedModifier: 0.9785714
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.8428572
+      adsSpeedModifier: 0.93571424
+      moveSpeedModifier: 0.9642857
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.8
+      adsSpeedModifier: 0.9
+      moveSpeedModifier: 0.95
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    magazines:
+    - {fileID: 1407110048202902, guid: 37af3ea05f65d6b4e9a908218ae4786c, type: 3}
+    - {fileID: 1501879838907220, guid: 98d64e1ba5c40c64d994519593992de0, type: 3}
+    - {fileID: 1785292791707622, guid: 47ffd00813ef1804a97396624ef490e7, type: 3}
+    - {fileID: 1159489623021366, guid: facb4a71a755c9042a03f135d11135f5, type: 3}
+    - {fileID: 1968714588955312, guid: b48c09f3285bc20439d4ea0fb9e5f80b, type: 3}
+    - {fileID: 1000445967190448, guid: 63fa8de42a832a74cad721fc3580c525, type: 3}
+    - {fileID: 1713737723348446, guid: 239ede39d6b1274439f33c16da2c2782, type: 3}
+    - {fileID: 1987282599966964, guid: 0f5866b093662bc4fb8e799e5cf0690a, type: 3}
+    - {fileID: 1675174649049174, guid: 550ad6766efc3ac4c8a69d6e2597cff9, type: 3}
+    magazineNames:
+    - Mag 01
+    - Mag 02
+    - Mag 03
+    - Mag 04
+    - Mag 05
+    - Mag 06
+    - Mag 07
+    - Mag 08
+    - Mag 09
+    magazineModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.9975
+      reloadTimeModifier: 1.025
+      soundRangeModifier: 1
+      magazineSizeBonus: 2
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.995
+      reloadTimeModifier: 1.05
+      soundRangeModifier: 1
+      magazineSizeBonus: 5
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.9925
+      reloadTimeModifier: 1.075
+      soundRangeModifier: 1
+      magazineSizeBonus: 8
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.99
+      reloadTimeModifier: 1.1
+      soundRangeModifier: 1
+      magazineSizeBonus: 10
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.9875
+      reloadTimeModifier: 1.125
+      soundRangeModifier: 1
+      magazineSizeBonus: 12
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.985
+      reloadTimeModifier: 1.1500001
+      soundRangeModifier: 1
+      magazineSizeBonus: 15
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.9825
+      reloadTimeModifier: 1.1750001
+      soundRangeModifier: 1
+      magazineSizeBonus: 18
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.98
+      reloadTimeModifier: 1.2
+      soundRangeModifier: 1
+      magazineSizeBonus: 20
+      aimFOVOverride: 0
+      addsSilencer: 0
+    handles:
+    - {fileID: 1612122444460234, guid: 31a8c90d1e42062449ba6a72f529fd15, type: 3}
+    - {fileID: 1477454410383694, guid: 98fe1580a1bd8424a9941ae86c08f55c, type: 3}
+    handleNames:
+    - Handle 01
+    - Handle 02
+    handleModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    triggers:
+    - {fileID: 1100269868791726, guid: 20b5b11b34b5a444895b00afcb293dd1, type: 3}
+    - {fileID: 1058892221176854, guid: cb8ab335fe8e22b4985d11186e3ad821, type: 3}
+    - {fileID: 1107998111235312, guid: 825566ced3b63c24e8bf604bf9d659ab, type: 3}
+    triggerNames:
+    - Trigger 01
+    - Trigger 02
+    - Trigger 03
+    triggerModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+  weaponB:
+    platformName: Weapon_B
+    bodyPrefab: {fileID: 1702636704965320, guid: a7278d81fe3ac284ba2b0212798da66e, type: 3}
+    baseStats:
+      damage: 25
+      fireRate: 0.1
+      range: 100
+      accuracy: 0.9
+      recoilVertical: 2
+      recoilHorizontal: 1
+      adsSpeed: 10
+      aimFOV: 45
+      moveSpeedMultiplier: 1
+      adsMovePenalty: 0.7
+      magazineSize: 30
+      reloadTime: 2.5
+      isSilenced: 0
+      soundRange: 50
+    barrels:
+    - {fileID: 1768567697993582, guid: ba454abc073197a4d86d2ace7885a4ed, type: 3}
+    - {fileID: 1975973085400898, guid: f048f067655af87478b3d387820e2e64, type: 3}
+    - {fileID: 1569269932108202, guid: d8fd7b8cfacf568418d0c6e88a56350e, type: 3}
+    - {fileID: 1888648028291490, guid: 3fb808f43fcedb345ba5e84871097fbb, type: 3}
+    - {fileID: 1917071327061510, guid: 9c5dc42ae0b020e4cbab8c9e35b28951, type: 3}
+    - {fileID: 1049920004115930, guid: f6b9baa5317d9ed42bab107378805469, type: 3}
+    barrelNames:
+    - Barrel 01
+    - Barrel 02
+    - Barrel 03
+    - Barrel 04
+    - Barrel 05
+    - Barrel 06
+    barrelModifiers:
+    - damageModifier: 0.95
+      fireRateModifier: 1
+      rangeModifier: 0.8
+      accuracyModifier: 0.9
+      recoilModifier: 1
+      adsSpeedModifier: 1.1
+      moveSpeedModifier: 1.05
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 0.98
+      fireRateModifier: 1
+      rangeModifier: 0.9
+      accuracyModifier: 0.95
+      recoilModifier: 1
+      adsSpeedModifier: 1.0500001
+      moveSpeedModifier: 1.03
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1.01
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.01
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1.04
+      fireRateModifier: 1
+      rangeModifier: 1.1
+      accuracyModifier: 1.05
+      recoilModifier: 1
+      adsSpeedModifier: 0.95000005
+      moveSpeedModifier: 0.98999995
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1.07
+      fireRateModifier: 1
+      rangeModifier: 1.1999999
+      accuracyModifier: 1.1
+      recoilModifier: 1
+      adsSpeedModifier: 0.90000004
+      moveSpeedModifier: 0.96999997
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1.1
+      fireRateModifier: 1
+      rangeModifier: 1.3
+      accuracyModifier: 1.15
+      recoilModifier: 1
+      adsSpeedModifier: 0.85
+      moveSpeedModifier: 0.95
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    grips:
+    - {fileID: 1862332885367462, guid: 04199c592a0f4ed409f0ce9e05f2f096, type: 3}
+    - {fileID: 1805015400452038, guid: 70c766a4c6a94b044b6c639caeeb6ffe, type: 3}
+    - {fileID: 1808571838470752, guid: fb0d7a4dc76dba847bec60824c6a8c32, type: 3}
+    gripNames:
+    - Grip 01
+    - Grip 02
+    - Grip 03
+    gripModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.85
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.90000004
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.95000005
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    handguards:
+    - {fileID: 1393701529459236, guid: 315555425d992a14e82896d402ac9979, type: 3}
+    - {fileID: 1437936403203472, guid: 32970629d5acff74787f1abed5133403, type: 3}
+    - {fileID: 1266663492455702, guid: 92fa742d714e3ec43b339d21e99a76b3, type: 3}
+    - {fileID: 1500690133489166, guid: 640b7524c5e5dde48881607f2492dc5e, type: 3}
+    - {fileID: 1042786204947120, guid: 797fb4a6999fe4d4c9fa005e5ea564c2, type: 3}
+    - {fileID: 1194059478240834, guid: 9b92288302752da4abeb20123d8b8ffb, type: 3}
+    - {fileID: 1748694236221198, guid: 0bf89792f9223104a8d5e3496f6d5b9d, type: 3}
+    - {fileID: 1651657805892150, guid: e70b4f0655b3b2246b033a9e5b37d296, type: 3}
+    - {fileID: 1153119816598480, guid: afc11a6d2c012cd43bd9aa2d7c78067c, type: 3}
+    - {fileID: 1210644440863344, guid: f9857c43036788945b30fcf3bf5164b7, type: 3}
+    handguardNames:
+    - Handguard Bullpup 01
+    - Handguard Bullpup 02
+    - Handguard Long 01
+    - Handguard Lower 01
+    - Handguard Lower 02
+    - Handguard Lower 03
+    - Handguard Lower 04
+    - Handguard Upper 01
+    - Handguard Upper 02
+    - Handguard Upper 03
+    handguardModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.02
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.0155555
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.0111111
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.0066667
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1.0022222
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.99777776
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.99333334
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.9888889
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.98444444
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.98
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    stocks:
+    - {fileID: 1090834663801806, guid: 8105b7be68137ba4bbc1903d7a08ebed, type: 3}
+    - {fileID: 1262049242749172, guid: 9564575be67b9f34a82351a06954d045, type: 3}
+    - {fileID: 1890742992811836, guid: 29a1d17895570fe41aa85de21bf07f62, type: 3}
+    - {fileID: 1853621806856980, guid: 3c4be611ee96b8c43b35fa2ec900282b, type: 3}
+    - {fileID: 1419951936301650, guid: 6f29fbd478468154791187c7926737bb, type: 3}
+    - {fileID: 1506307712928722, guid: 5622f76308acafb45b0f6e47a9533b93, type: 3}
+    - {fileID: 1066756723459282, guid: 5b25a11d14c846b4a91647a4bce60060, type: 3}
+    stockNames:
+    - Stock 01
+    - Stock 02
+    - Stock 03
+    - Stock 04
+    - Stock 05
+    - Stock 06
+    - Stock Bullpup 01
+    stockModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1.1
+      adsSpeedModifier: 1.15
+      moveSpeedModifier: 1.05
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1.0500001
+      adsSpeedModifier: 1.1083333
+      moveSpeedModifier: 1.0333333
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1.0666666
+      moveSpeedModifier: 1.0166667
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.95000005
+      adsSpeedModifier: 1.025
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.90000004
+      adsSpeedModifier: 0.9833333
+      moveSpeedModifier: 0.9833333
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.85
+      adsSpeedModifier: 0.94166666
+      moveSpeedModifier: 0.96666664
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.8
+      adsSpeedModifier: 0.9
+      moveSpeedModifier: 0.95
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    magazines:
+    - {fileID: 1250134597530838, guid: 984bd7971f2ed71448d25046ec104a64, type: 3}
+    - {fileID: 1478321837351090, guid: 73d73cdb3a1360d49b375bdbb4280f0f, type: 3}
+    - {fileID: 1477973260144702, guid: 0fa6fb6f35229fc4f900317d3999acdc, type: 3}
+    - {fileID: 1799909379393002, guid: aed8620a8d56d064980358429f5d9202, type: 3}
+    - {fileID: 1865124436800126, guid: e39fd50b8f7fbd948923f46888b33c92, type: 3}
+    - {fileID: 1308345154332464, guid: a8a02dce23060a24da0d63ab9ef0a576, type: 3}
+    - {fileID: 1057711968050936, guid: cda7daa41118a864590c628f09b35eb5, type: 3}
+    - {fileID: 1281403737171864, guid: e08e43a3067aa9144afa6ceafdbf86d7, type: 3}
+    magazineNames:
+    - Mag 01
+    - Mag 02
+    - Mag 03
+    - Mag 04
+    - Mag 05
+    - Mag 06
+    - Mag 07
+    - Mag 08
+    magazineModifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.99714285
+      reloadTimeModifier: 1.0285715
+      soundRangeModifier: 1
+      magazineSizeBonus: 3
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.9942857
+      reloadTimeModifier: 1.0571429
+      soundRangeModifier: 1
+      magazineSizeBonus: 6
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.99142855
+      reloadTimeModifier: 1.0857143
+      soundRangeModifier: 1
+      magazineSizeBonus: 9
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.98857147
+      reloadTimeModifier: 1.1142857
+      soundRangeModifier: 1
+      magazineSizeBonus: 11
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.9857143
+      reloadTimeModifier: 1.1428572
+      soundRangeModifier: 1
+      magazineSizeBonus: 14
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.98285717
+      reloadTimeModifier: 1.1714286
+      soundRangeModifier: 1
+      magazineSizeBonus: 17
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 0.98
+      reloadTimeModifier: 1.2
+      soundRangeModifier: 1
+      magazineSizeBonus: 20
+      aimFOVOverride: 0
+      addsSilencer: 0
+    handles: []
+    handleNames: []
+    handleModifiers: []
+    triggers: []
+    triggerNames: []
+    triggerModifiers: []
+  scopes:
+    categoryName: 
+    prefabs:
+    - {fileID: 1421519406005162, guid: ae1d88624bbe3a3409ac6c9bc5ea9bcb, type: 3}
+    - {fileID: 1803123784931580, guid: e6d2e2ab263fb4a45863261819498e94, type: 3}
+    - {fileID: 1941756591849396, guid: 886721a110fc7be4898b1b4109acbb35, type: 3}
+    - {fileID: 1200087030526520, guid: 8c20807b786fd174091ab0f1c65c9c70, type: 3}
+    - {fileID: 1490402153527656, guid: cf1516e386eb306499452820da21ee93, type: 3}
+    - {fileID: 1637051980639712, guid: e7dec10a27b4323458752542110fd8b4, type: 3}
+    - {fileID: 1751771208587822, guid: bfe9ff791857f5145a63a10c1692fc19, type: 3}
+    - {fileID: 1831414169744994, guid: a76e7949cd0f1484f98d7258bca70452, type: 3}
+    - {fileID: 1457074589251972, guid: b871f88d175ae324bb59e90c1f1549b4, type: 3}
+    - {fileID: 1047115101663054, guid: 4e4d86eea3efa1b468b4a222c8dda7ba, type: 3}
+    - {fileID: 1215386998680682, guid: 1aafa756cecacad4c8c40f57828c6b44, type: 3}
+    - {fileID: 1896550228845456, guid: 6c8ef82db0bd94c42918cb4e385c0c38, type: 3}
+    - {fileID: 1328099849722202, guid: 0489c980c9103e74d8862f2745c74c2c, type: 3}
+    - {fileID: 1409262723568388, guid: 9dc5c27f6881397449a454b29f3d66d7, type: 3}
+    - {fileID: 1862953817498416, guid: 100b069c0f92ea447ba557f3c6f08284, type: 3}
+    - {fileID: 1088738153202680, guid: 6c1e3044afeedd047adaa9b5298a504e, type: 3}
+    - {fileID: 1632117584443096, guid: a5f96ee709aa47e46a17edd0955c756e, type: 3}
+    - {fileID: 1242899488601990, guid: 102c0991da23e1e4181ea5e3694aa8ce, type: 3}
+    - {fileID: 1601405959989486, guid: 73817da27952e9144850baf83816c36a, type: 3}
+    - {fileID: 1057882598200570, guid: 752d7599581b3004798189c5c0bc9731, type: 3}
+    - {fileID: 1688903224636864, guid: 77433a509952f5947a4efec87b84550e, type: 3}
+    displayNames:
+    - Scope 01
+    - Scope 02
+    - Scope 03
+    - Scope 04
+    - Scope 05
+    - Scope 06
+    - Scope 07
+    - Scope 08
+    - Scope 09
+    - Scope 10
+    - Scope 11
+    - Scope 12
+    - Scope 13
+    - Scope 14
+    - Scope 15
+    - Scope Flip 01
+    - Reddot 01
+    - Reddot 02
+    - Reddot 03
+    - Reddot 04
+    - Reddot 05
+    modifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.05
+      recoilModifier: 1
+      adsSpeedModifier: 1.05
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 55
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.0625
+      recoilModifier: 1
+      adsSpeedModifier: 1.0324999
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 53
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.0749999
+      recoilModifier: 1
+      adsSpeedModifier: 1.015
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 51
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.0875
+      recoilModifier: 1
+      adsSpeedModifier: 0.99749994
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 49
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.0999999
+      recoilModifier: 1
+      adsSpeedModifier: 0.97999996
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 47
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.1125
+      recoilModifier: 1
+      adsSpeedModifier: 0.9625
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 45
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.125
+      recoilModifier: 1
+      adsSpeedModifier: 0.94499993
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 43
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.1374999
+      recoilModifier: 1
+      adsSpeedModifier: 0.92749995
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 41
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.15
+      recoilModifier: 1
+      adsSpeedModifier: 0.90999997
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 39
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.1624999
+      recoilModifier: 1
+      adsSpeedModifier: 0.8925
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 37
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.175
+      recoilModifier: 1
+      adsSpeedModifier: 0.875
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 35
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.1875
+      recoilModifier: 1
+      adsSpeedModifier: 0.85749996
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 33
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.1999999
+      recoilModifier: 1
+      adsSpeedModifier: 0.84
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 31
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.2125
+      recoilModifier: 1
+      adsSpeedModifier: 0.8225
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 29
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.2249999
+      recoilModifier: 1
+      adsSpeedModifier: 0.805
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 27
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.2375
+      recoilModifier: 1
+      adsSpeedModifier: 0.78749996
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 25
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.25
+      recoilModifier: 1
+      adsSpeedModifier: 0.77
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 23
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.2624999
+      recoilModifier: 1
+      adsSpeedModifier: 0.7525
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 21
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.275
+      recoilModifier: 1
+      adsSpeedModifier: 0.735
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 19
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.2874999
+      recoilModifier: 1
+      adsSpeedModifier: 0.7175
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 17
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.3
+      recoilModifier: 1
+      adsSpeedModifier: 0.7
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 15
+      addsSilencer: 0
+    icons: []
+  muzzleDevices:
+    categoryName: 
+    prefabs:
+    - {fileID: 1380941306134420, guid: 58563013acc463446bbdcef190d42184, type: 3}
+    - {fileID: 1325450779528548, guid: 1347a9918f862084a872e0876844300c, type: 3}
+    - {fileID: 1722043623919770, guid: a14c9c29ae909934987daf6d55cb0bed, type: 3}
+    - {fileID: 1516356417727406, guid: 1f4c00d5c1fada043b7242771a446ea1, type: 3}
+    - {fileID: 1741574621591698, guid: 05a75d7a351a7c84fa4cfcbfcf027951, type: 3}
+    - {fileID: 1760692520725492, guid: 5e0332472e69ef94cb4f1a74c878bd77, type: 3}
+    - {fileID: 1471528519958916, guid: ff3eba7321f355344a0ffdf29f5513ae, type: 3}
+    displayNames:
+    - Silencer 01
+    - Silencer 02
+    - Silencer 03
+    - Muzzlebrake 01
+    - Muzzlebrake 02
+    - Muzzlebrake 03
+    - Muzzlebrake 04
+    modifiers:
+    - damageModifier: 0.95
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.9
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 0.3
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 1
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.85
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1.2
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 0.95
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.9
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 0.3
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 1
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.85
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1.2
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 0.95
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.9
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 0.3
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 1
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.85
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1.2
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 0.95
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.9
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 0.3
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 1
+    icons: []
+  foreGrips:
+    categoryName: 
+    prefabs:
+    - {fileID: 1555638022686688, guid: 28d8d6eed811c6548b1fd1c6fe794fa6, type: 3}
+    - {fileID: 1608397426037152, guid: 8fa3c0575ef6a924bb17bf2ae6a38105, type: 3}
+    - {fileID: 1463177406942368, guid: 5a09faadfaa46914695a75054560cccd, type: 3}
+    - {fileID: 1867553690570058, guid: af13bcf3c33ecf842b5ec682b2ded9f3, type: 3}
+    - {fileID: 1765433544443052, guid: ab3ae752729021a46b875f6ae4438549, type: 3}
+    - {fileID: 1505019583291248, guid: 874b6be1d3107be4b89f33fe8398b28e, type: 3}
+    displayNames:
+    - Foregrip 01
+    - Foregrip 02
+    - Foregrip 03
+    - Foregrip 04
+    - Foregrip 05
+    - Foregrip 06
+    modifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.95
+      adsSpeedModifier: 1.1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.92
+      adsSpeedModifier: 1.07
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.89
+      adsSpeedModifier: 1.04
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.86
+      adsSpeedModifier: 1.01
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.83
+      adsSpeedModifier: 0.98
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 0.8
+      adsSpeedModifier: 0.95
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    icons: []
+  bipods:
+    categoryName: 
+    prefabs:
+    - {fileID: 1220400002299712, guid: ed92eed22d68f4a45bbf37f49bcd8c24, type: 3}
+    - {fileID: 1517707176834068, guid: 19001b9713057f64db1be7d11baa3a5b, type: 3}
+    - {fileID: 1888143297928414, guid: 0496f150699766d448fe078965f21c3e, type: 3}
+    displayNames:
+    - Bipod 01
+    - Bipod 02
+    - Bipod 03
+    modifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.2
+      recoilModifier: 0.6
+      adsSpeedModifier: 0.85
+      moveSpeedModifier: 0.95
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.2
+      recoilModifier: 0.6
+      adsSpeedModifier: 0.85
+      moveSpeedModifier: 0.95
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1.2
+      recoilModifier: 0.6
+      adsSpeedModifier: 0.85
+      moveSpeedModifier: 0.95
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    icons: []
+  lasers:
+    categoryName: 
+    prefabs:
+    - {fileID: 1541838737817162, guid: f6e0fc11bc0ca3941a390a4a11265cee, type: 3}
+    - {fileID: 1541066314473664, guid: d4f0f6b73d8353b4584a2c918082c5a2, type: 3}
+    displayNames:
+    - Laser 01
+    - Laser 02
+    modifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    icons: []
+  flashlights:
+    categoryName: 
+    prefabs:
+    - {fileID: 1162793710245078, guid: 1103d7d13259b504389105868ed0ebe3, type: 3}
+    - {fileID: 1811394170621162, guid: 586a040cfc875724c95309a40be7a379, type: 3}
+    displayNames:
+    - Flashlight 01
+    - Flashlight 02
+    modifiers:
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    - damageModifier: 1
+      fireRateModifier: 1
+      rangeModifier: 1
+      accuracyModifier: 1
+      recoilModifier: 1
+      adsSpeedModifier: 1
+      moveSpeedModifier: 1
+      reloadTimeModifier: 1
+      soundRangeModifier: 1
+      magazineSizeBonus: 0
+      aimFOVOverride: 0
+      addsSilencer: 0
+    icons: []
+  weaponPresets:
+  - {fileID: 1732325602239962, guid: 1c56eb60fa005384ea10c8db0438b764, type: 3}
+  - {fileID: 1188837925872254, guid: e8a167e3e5e548b4896befbd79964392, type: 3}
+  - {fileID: 1464271373217014, guid: ad69abc8597c85e419faf2f56af475eb, type: 3}
+  - {fileID: 1206012272168672, guid: a1f7d22f9f0fa1543bbbadeb0942f75d, type: 3}
+  - {fileID: 1142781627598564, guid: f2d3c1000666f4f4083180b2cca9a345, type: 3}
+  - {fileID: 1940089934359856, guid: e61711ec81d1ad54e91f620fd771e541, type: 3}
+  - {fileID: 1459817418512180, guid: d237b571c339510448e8d30946bb59eb, type: 3}
+  - {fileID: 1615021943274614, guid: 6f0a628c6b303b04b9e4dd6d597db728, type: 3}
+  - {fileID: 1943944113843638, guid: b288a322da7b545429a0f6f3f7093b6b, type: 3}
+  - {fileID: 1428701504022370, guid: 0562e703df862c44aba6149b49337594, type: 3}
+  - {fileID: 1837798106013140, guid: 6f2d8f75056eab94e8209780bf426aa9, type: 3}
+  - {fileID: 1947799447395298, guid: 453850fd11c6f2f4abbc406c887fb90c, type: 3}
+  - {fileID: 1344463760805258, guid: 0e2bb5728b2c3314ab9a11be387f5a80, type: 3}
+  - {fileID: 1775407650306278, guid: c2d5b7c473997b9428dcd75e2d9a1619, type: 3}
+  presetNames:
+  - A Complex 01
+  - A Heavy 01
+  - A Rifle 01
+  - A Rifle 02
+  - A Rifle 03
+  - A SMG 01
+  - A Sniper 01
+  - B Complex 01
+  - B Heavy 01
+  - B Rifle 01
+  - B Rifle 02
+  - B Rifle 03
+  - B SMG 01
+  - B Sniper 01
+  presetStats:
+  - damage: 28
+    fireRate: 0.1
+    range: 120
+    accuracy: 0.85
+    recoilVertical: 2
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 35
+    moveSpeedMultiplier: 0.95
+    adsMovePenalty: 0.7
+    magazineSize: 30
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 35
+    fireRate: 0.08
+    range: 100
+    accuracy: 0.7
+    recoilVertical: 3
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 40
+    moveSpeedMultiplier: 0.7
+    adsMovePenalty: 0.7
+    magazineSize: 100
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 28
+    fireRate: 0.1
+    range: 120
+    accuracy: 0.85
+    recoilVertical: 2
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 35
+    moveSpeedMultiplier: 0.95
+    adsMovePenalty: 0.7
+    magazineSize: 30
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 28
+    fireRate: 0.1
+    range: 120
+    accuracy: 0.85
+    recoilVertical: 2
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 35
+    moveSpeedMultiplier: 0.95
+    adsMovePenalty: 0.7
+    magazineSize: 30
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 28
+    fireRate: 0.1
+    range: 120
+    accuracy: 0.85
+    recoilVertical: 2
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 35
+    moveSpeedMultiplier: 0.95
+    adsMovePenalty: 0.7
+    magazineSize: 30
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 18
+    fireRate: 0.06
+    range: 50
+    accuracy: 0.75
+    recoilVertical: 1.5
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 50
+    moveSpeedMultiplier: 1.1
+    adsMovePenalty: 0.7
+    magazineSize: 35
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 85
+    fireRate: 1.2
+    range: 200
+    accuracy: 0.95
+    recoilVertical: 4
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 15
+    moveSpeedMultiplier: 0.8
+    adsMovePenalty: 0.7
+    magazineSize: 5
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 28
+    fireRate: 0.1
+    range: 120
+    accuracy: 0.85
+    recoilVertical: 2
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 35
+    moveSpeedMultiplier: 0.95
+    adsMovePenalty: 0.7
+    magazineSize: 30
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 35
+    fireRate: 0.08
+    range: 100
+    accuracy: 0.7
+    recoilVertical: 3
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 40
+    moveSpeedMultiplier: 0.7
+    adsMovePenalty: 0.7
+    magazineSize: 100
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 28
+    fireRate: 0.1
+    range: 120
+    accuracy: 0.85
+    recoilVertical: 2
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 35
+    moveSpeedMultiplier: 0.95
+    adsMovePenalty: 0.7
+    magazineSize: 30
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 28
+    fireRate: 0.1
+    range: 120
+    accuracy: 0.85
+    recoilVertical: 2
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 35
+    moveSpeedMultiplier: 0.95
+    adsMovePenalty: 0.7
+    magazineSize: 30
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 28
+    fireRate: 0.1
+    range: 120
+    accuracy: 0.85
+    recoilVertical: 2
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 35
+    moveSpeedMultiplier: 0.95
+    adsMovePenalty: 0.7
+    magazineSize: 30
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 18
+    fireRate: 0.06
+    range: 50
+    accuracy: 0.75
+    recoilVertical: 1.5
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 50
+    moveSpeedMultiplier: 1.1
+    adsMovePenalty: 0.7
+    magazineSize: 35
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  - damage: 85
+    fireRate: 1.2
+    range: 200
+    accuracy: 0.95
+    recoilVertical: 4
+    recoilHorizontal: 1
+    adsSpeed: 10
+    aimFOV: 15
+    moveSpeedMultiplier: 0.8
+    adsMovePenalty: 0.7
+    magazineSize: 5
+    reloadTime: 2.5
+    isSilenced: 0
+    soundRange: 50
+  rotationSpeed: 30
 --- !u!1 &1383627488
 GameObject:
   m_ObjectHideFlags: 0

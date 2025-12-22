@@ -7,8 +7,8 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     [Header("Movement Settings")]
     public float walkSpeed = 5f;
     public float sprintSpeed = 10f;
-    public float jumpHeight = 2f;
-    public float gravity = -9.81f;
+    public float jumpHeight = 1.8f;
+    public float gravity = -35f;
 
     [Header("Mouse Look Settings")]
     public float mouseSensitivity = 2f;
@@ -80,6 +80,14 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     // Movement
     private Vector3 velocity;
     private float currentSpeed;
+
+    // Jump buffering
+    private float jumpBufferTime = 0.15f;
+    private float jumpBufferCounter;
+    private float coyoteTime = 0.1f;
+    private float coyoteCounter;
+    private int jumpCount = 0;
+    private int maxJumps = 2;
 
     // Mouse look
     private float rotationX = 0f;
@@ -173,11 +181,18 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
     public GameObject[] facewearPrefabs;
     public GameObject[] backpackPrefabs;
 
+    [Header("K-9 Companion")]
+    public GameObject[] dogPrefabs;
+    private GameObject playerDog;
+
     void Start()
     {
         controller = GetComponent<CharacterController>();
         animator = GetComponentInChildren<Animator>();
         currentHealth = maxHealth;
+
+        // Clean up any leftover MainMenuUI from scene transition
+        CleanupMainMenuUI();
 
         // Setup weapon audio
         weaponAudio = gameObject.AddComponent<AudioSource>();
@@ -349,6 +364,54 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         }
     }
 
+    void SpawnPlayerDog()
+    {
+        // Only spawn dog for local player
+        if (!photonView.IsMine) return;
+
+        // Get saved dog index for this team
+        string teamName = playerTeam == Team.Phantom ? "Phantom" : "Havoc";
+        int dogIndex = PlayerPrefs.GetInt($"{teamName}_DogIndex", 0);
+
+        // Validate index and prefabs
+        if (dogPrefabs == null || dogPrefabs.Length == 0)
+        {
+            Debug.LogWarning("[FPSControllerPhoton] No dog prefabs assigned!");
+            return;
+        }
+
+        if (dogIndex < 0 || dogIndex >= dogPrefabs.Length)
+        {
+            dogIndex = 0; // Fallback to first dog
+        }
+
+        GameObject dogPrefab = dogPrefabs[dogIndex];
+        if (dogPrefab == null)
+        {
+            Debug.LogWarning($"[FPSControllerPhoton] Dog prefab at index {dogIndex} is null!");
+            return;
+        }
+
+        // Spawn dog next to player
+        Vector3 spawnPos = transform.position + transform.right * 2f + Vector3.up * 0.5f;
+        playerDog = Instantiate(dogPrefab, spawnPos, transform.rotation);
+        playerDog.name = $"PlayerDog_{photonView.ViewID}";
+
+        // Setup DogController
+        DogController dogController = playerDog.GetComponent<DogController>();
+        if (dogController == null)
+        {
+            dogController = playerDog.AddComponent<DogController>();
+        }
+
+        // Configure dog to follow this player
+        dogController.team = playerTeam;
+        dogController.playerHandler = this;
+        dogController.handler = null; // Clear any AI handler
+
+        Debug.Log($"[FPSControllerPhoton] Spawned player dog: {dogPrefab.name} for team {teamName}");
+    }
+
     void InitializeLocalPlayer()
     {
         // Ensure only one local player exists
@@ -427,7 +490,213 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         Cursor.visible = false;
 
         currentWeaponOffset = weaponOffset;
+
+        // Apply player's custom weapon loadout
+        ApplyWeaponLoadout();
+
         isInitialized = true;
+
+        // Spawn player's K-9 companion
+        SpawnPlayerDog();
+    }
+
+    void ApplyWeaponLoadout()
+    {
+        // Load the active loadout from PlayerPrefs
+        string loadoutJson = PlayerPrefs.GetString("ActiveLoadout", "");
+        Debug.Log($"[FPSControllerPhoton] Loading weapon loadout, JSON length: {loadoutJson?.Length ?? 0}");
+
+        if (string.IsNullOrEmpty(loadoutJson))
+        {
+            Debug.Log("[FPSControllerPhoton] No custom weapon loadout found, using defaults");
+            return;
+        }
+
+        try
+        {
+            WeaponBuildData build = WeaponBuildData.FromJson(loadoutJson);
+            if (build == null)
+            {
+                Debug.LogWarning("[FPSControllerPhoton] Failed to parse weapon build from JSON");
+                return;
+            }
+
+            Debug.Log($"[FPSControllerPhoton] Loaded build: presetIndex={build.presetIndex}, platform={build.platform}");
+
+            // Find WeaponCustomizer (use singleton or search scene)
+            WeaponCustomizer customizer = WeaponCustomizer.Instance;
+            Debug.Log($"[FPSControllerPhoton] WeaponCustomizer.Instance: {(customizer != null ? customizer.name : "null")}");
+
+            if (customizer == null)
+            {
+                customizer = FindFirstObjectByType<WeaponCustomizer>();
+                Debug.Log($"[FPSControllerPhoton] FindFirstObjectByType result: {(customizer != null ? customizer.name : "null")}");
+            }
+
+            if (customizer != null)
+            {
+                int presetCount = customizer.GetPresetCount();
+                Debug.Log($"[FPSControllerPhoton] WeaponCustomizer has {presetCount} presets");
+
+                // Use preset stats (not calculated from parts)
+                WeaponStats stats = customizer.GetPresetStats(build.presetIndex);
+                if (stats != null)
+                {
+                    // Apply stats
+                    fireRate = stats.fireRate;
+                    damage = stats.damage;
+                    range = stats.range;
+                    aimFOV = stats.aimFOV;
+                    aimSpeed = stats.adsSpeed;
+
+                    Debug.Log($"[FPSControllerPhoton] Applied preset {build.presetIndex} - Damage: {damage}, FireRate: {fireRate}, Range: {range}");
+
+                    // Sync weapon preset to other players
+                    photonView.RPC("RPC_SyncWeaponPreset", RpcTarget.Others, build.presetIndex);
+                }
+                else
+                {
+                    Debug.LogWarning($"[FPSControllerPhoton] GetPresetStats returned null for preset {build.presetIndex}");
+                }
+
+                // Swap the weapon model to match the preset
+                ApplyWeaponModel(customizer, build.presetIndex);
+            }
+            else
+            {
+                Debug.LogWarning("[FPSControllerPhoton] WeaponCustomizer not found, cannot apply loadout stats");
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[FPSControllerPhoton] Error applying weapon loadout: {e.Message}\n{e.StackTrace}");
+        }
+    }
+
+    [PunRPC]
+    void RPC_SyncWeaponAppearance(int[] attachmentIndices)
+    {
+        // Apply weapon appearance for remote players
+        // This is called when a player joins or when weapon is changed
+        Debug.Log($"[FPSControllerPhoton] Received weapon appearance sync with {attachmentIndices?.Length ?? 0} indices");
+
+        // Find the weapon assembler on this player's weapon
+        ModularWeaponAssembler assembler = GetComponentInChildren<ModularWeaponAssembler>();
+        if (assembler != null)
+        {
+            WeaponCustomizer customizer = FindFirstObjectByType<WeaponCustomizer>();
+            if (customizer != null)
+            {
+                assembler.ApplyAttachmentIndices(attachmentIndices, customizer);
+            }
+        }
+    }
+
+    [PunRPC]
+    void RPC_SyncWeaponPreset(int presetIndex)
+    {
+        // Apply weapon preset for remote players
+        Debug.Log($"[FPSControllerPhoton] Received weapon preset sync: {presetIndex}");
+
+        WeaponCustomizer customizer = WeaponCustomizer.Instance ?? FindFirstObjectByType<WeaponCustomizer>();
+        if (customizer != null)
+        {
+            ApplyWeaponModel(customizer, presetIndex);
+        }
+    }
+
+    void ApplyWeaponModel(WeaponCustomizer customizer, int presetIndex)
+    {
+        if (customizer == null || customizer.weaponPresets == null) return;
+        if (presetIndex < 0 || presetIndex >= customizer.weaponPresets.Length) return;
+
+        GameObject presetPrefab = customizer.weaponPresets[presetIndex];
+        if (presetPrefab == null) return;
+
+        // First, destroy/hide the existing weaponTransform if it exists (the default weapon)
+        if (weaponTransform != null)
+        {
+            Debug.Log($"[FPSControllerPhoton] Destroying existing weapon: {weaponTransform.name}");
+            Destroy(weaponTransform.gameObject);
+            weaponTransform = null;
+        }
+
+        // Find the weapon holder (where the gun model goes)
+        Transform weaponHolder = cameraTransform;
+        if (weaponHolder == null)
+        {
+            weaponHolder = transform.Find("WeaponHolder");
+        }
+        if (weaponHolder == null && playerCamera != null)
+        {
+            weaponHolder = playerCamera.transform;
+        }
+        if (weaponHolder == null)
+        {
+            Debug.LogWarning("[FPSControllerPhoton] No weapon holder found for weapon model");
+            return;
+        }
+
+        // Remove any other weapon models that might exist on the camera
+        foreach (Transform child in weaponHolder)
+        {
+            if (child.name.ToLower().Contains("weapon") || child.name.ToLower().Contains("gun") ||
+                child.name.ToLower().Contains("preset") || child.name.ToLower().Contains("sm_wep"))
+            {
+                Destroy(child.gameObject);
+            }
+        }
+
+        // Also check player root for any weapon objects
+        foreach (Transform child in transform)
+        {
+            string lowerName = child.name.ToLower();
+            if (lowerName.Contains("weapon") || lowerName.Contains("gun") ||
+                lowerName.Contains("sm_wep") || lowerName.Contains("rifle") ||
+                lowerName.Contains("pistol") || lowerName.Contains("preset"))
+            {
+                Debug.Log($"[FPSControllerPhoton] Removing old weapon from player root: {child.name}");
+                Destroy(child.gameObject);
+            }
+        }
+
+        // Instantiate the new weapon model
+        GameObject weaponModel = Instantiate(presetPrefab, weaponHolder);
+        weaponModel.name = "WeaponModel_" + presetPrefab.name;
+        weaponModel.transform.localPosition = new Vector3(0.2f, -0.2f, 0.4f);
+        weaponModel.transform.localRotation = Quaternion.identity;
+        weaponModel.transform.localScale = Vector3.one;
+
+        // Set as the new weaponTransform so weapon bob/positioning works
+        weaponTransform = weaponModel.transform;
+
+        // Disable any colliders on the weapon model
+        foreach (var col in weaponModel.GetComponentsInChildren<Collider>())
+        {
+            col.enabled = false;
+        }
+
+        // Try to find muzzle point on the new weapon
+        Transform newMuzzle = weaponModel.transform.Find("MuzzlePoint");
+        if (newMuzzle == null) newMuzzle = weaponModel.transform.Find("Muzzle");
+        if (newMuzzle == null)
+        {
+            // Search children for anything with muzzle in name
+            foreach (Transform child in weaponModel.GetComponentsInChildren<Transform>())
+            {
+                if (child.name.ToLower().Contains("muzzle"))
+                {
+                    newMuzzle = child;
+                    break;
+                }
+            }
+        }
+        if (newMuzzle != null)
+        {
+            muzzlePoint = newMuzzle;
+        }
+
+        Debug.Log($"[FPSControllerPhoton] Applied weapon model: {presetPrefab.name}, weaponTransform set, muzzle: {(muzzlePoint != null ? muzzlePoint.name : "not found")}");
     }
 
     void InitializeRemotePlayer()
@@ -1411,9 +1680,34 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         Vector3 move = transform.right * moveX + transform.forward * moveZ;
         controller.Move(move * currentSpeed * Time.deltaTime);
 
-        if (jumpPressed && controller.isGrounded)
+        // Coyote time - allow jumping shortly after leaving ground
+        if (controller.isGrounded)
+        {
+            coyoteCounter = coyoteTime;
+            jumpCount = 0;
+        }
+        else
+        {
+            coyoteCounter -= Time.deltaTime;
+        }
+
+        // Jump buffer - remember jump input for a short time
+        if (jumpPressed)
+        {
+            jumpBufferCounter = jumpBufferTime;
+        }
+        else
+        {
+            jumpBufferCounter -= Time.deltaTime;
+        }
+
+        // Execute jump if buffered and can jump (ground jump or double jump)
+        if (jumpBufferCounter > 0f && (coyoteCounter > 0f || jumpCount < maxJumps))
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            jumpBufferCounter = 0f;
+            coyoteCounter = 0f;
+            jumpCount++;
         }
 
         velocity.y += gravity * Time.deltaTime;
@@ -1974,6 +2268,30 @@ public class FPSControllerPhoton : MonoBehaviourPunCallbacks, IPunObservable
         Vector3 finalOffset = currentWeaponOffset + bobOffset;
         weaponTransform.position = cameraPos + cameraRot * finalOffset;
         weaponTransform.rotation = cameraRot;
+    }
+
+    void CleanupMainMenuUI()
+    {
+        // Find and destroy any leftover MainMenuUI canvases from the main menu scene
+        // This can happen if the MainMenuUI is on a DontDestroyOnLoad object
+        MainMenuUI[] menuUIs = FindObjectsByType<MainMenuUI>(FindObjectsSortMode.None);
+        foreach (var menuUI in menuUIs)
+        {
+            Debug.Log($"[FPSControllerPhoton] Destroying leftover MainMenuUI: {menuUI.gameObject.name}");
+            Destroy(menuUI.gameObject);
+        }
+
+        // Also look for any Canvas with "MainMenu" or "Loading" in the name
+        Canvas[] allCanvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        foreach (var canvas in allCanvases)
+        {
+            string name = canvas.gameObject.name.ToLower();
+            if (name.Contains("mainmenu") || name.Contains("menu_canvas") || name.Contains("loading"))
+            {
+                Debug.Log($"[FPSControllerPhoton] Destroying leftover canvas: {canvas.gameObject.name}");
+                Destroy(canvas.gameObject);
+            }
+        }
     }
 
     // IPunObservable - syncs data across network

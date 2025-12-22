@@ -49,6 +49,18 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
     private TextMeshProUGUI popupValue;
     private bool isCustomizing = false;
 
+    [Header("Weapon Customizer")]
+    public WeaponCustomizer weaponCustomizer;
+    private bool isCustomizingWeapon = false;
+    private GameObject weaponPreview;
+    private GameObject weaponEditorPanel;
+    private TextMeshProUGUI[] statBarLabels;
+    private Image[] statBarFills;
+    private TextMeshProUGUI currentPartLabel;
+    private TextMeshProUGUI currentPartValue;
+    private string selectedWeaponPart = "Barrel";
+    private int currentEditingLoadout = 0;
+
     // Colors - Modern Warfare style
     private Color bgDark = new Color(0.06f, 0.06f, 0.08f);
     private Color cardBg = new Color(0.1f, 0.1f, 0.12f);
@@ -65,6 +77,7 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
     private Camera menuCamera;
     private GameObject showcaseModel;
     private GameObject playerShowcaseCharacter;
+    private GameObject showcaseDog;
     private GameObject[] currentAttachments = new GameObject[3]; // headgear, facewear, backpack
 
     // Cached original attachment transforms (stored once per character)
@@ -116,6 +129,33 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
             else
             {
                 Debug.LogWarning("[MainMenuUI] CharacterCustomizer not found! Add a CharacterCustomizer component to the scene.");
+            }
+        }
+
+        // Auto-find WeaponCustomizer if not assigned
+        if (weaponCustomizer == null)
+        {
+            // Try singleton first
+            weaponCustomizer = WeaponCustomizer.Instance;
+            if (weaponCustomizer == null)
+            {
+                weaponCustomizer = GetComponent<WeaponCustomizer>();
+            }
+            if (weaponCustomizer == null)
+            {
+                weaponCustomizer = GetComponentInChildren<WeaponCustomizer>();
+            }
+            if (weaponCustomizer == null)
+            {
+                weaponCustomizer = FindFirstObjectByType<WeaponCustomizer>();
+            }
+            if (weaponCustomizer != null)
+            {
+                Debug.Log($"[MainMenuUI] Found WeaponCustomizer on: {weaponCustomizer.gameObject.name}");
+            }
+            else
+            {
+                Debug.LogWarning("[MainMenuUI] WeaponCustomizer not found! Add one to the scene and run Auto-Populate.");
             }
         }
 
@@ -392,6 +432,9 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
 
                 // Apply saved attachments
                 ApplyShowcaseAttachments("Phantom");
+
+                // Spawn the player's dog next to the character
+                SpawnShowcaseDog("Phantom");
             }
         }
 
@@ -825,6 +868,68 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         catch { }
     }
 
+    void SpawnShowcaseDog(string team)
+    {
+        // Destroy existing dog
+        if (showcaseDog != null)
+        {
+            Destroy(showcaseDog);
+            showcaseDog = null;
+        }
+
+        if (characterCustomizer == null)
+        {
+            Debug.LogWarning("[MainMenuUI] SpawnShowcaseDog: characterCustomizer is null!");
+            return;
+        }
+
+        if (playerShowcaseCharacter == null)
+        {
+            Debug.LogWarning("[MainMenuUI] SpawnShowcaseDog: playerShowcaseCharacter is null!");
+            return;
+        }
+
+        int dogCount = characterCustomizer.GetOptionCount(team, "Dog");
+        Debug.Log($"[MainMenuUI] SpawnShowcaseDog: team={team}, dogCount={dogCount}");
+
+        GameObject dogPrefab = characterCustomizer.GetSelectedDogPrefab(team);
+        if (dogPrefab == null)
+        {
+            Debug.LogWarning($"[MainMenuUI] SpawnShowcaseDog: No dog prefab found for team {team}. Make sure dogPrefabs is assigned in CharacterCustomizer!");
+            return;
+        }
+
+        Debug.Log($"[MainMenuUI] Spawning dog: {dogPrefab.name}");
+
+        // Position dog to the right of the character, facing slightly toward camera
+        Vector3 dogPos = playerShowcaseCharacter.transform.position + new Vector3(1.2f, 0, 0.3f);
+        Quaternion dogRot = Quaternion.Euler(0, 200, 0); // Facing similar direction as player
+
+        showcaseDog = Instantiate(dogPrefab, dogPos, dogRot);
+        showcaseDog.transform.SetParent(showcaseModel.transform);
+        showcaseDog.name = "ShowcaseDog";
+
+        // Disable gameplay components
+        DisableGameplayComponents(showcaseDog);
+
+        // Setup idle animation
+        var animator = showcaseDog.GetComponent<Animator>();
+        if (animator == null)
+        {
+            animator = showcaseDog.GetComponentInChildren<Animator>();
+        }
+
+        if (animator != null && animator.runtimeAnimatorController != null)
+        {
+            animator.enabled = true;
+            animator.applyRootMotion = false;
+            // Set to idle/sit pose
+            animator.SetFloat("Movement_f", 0f);
+            animator.SetBool("Grounded_b", true);
+            animator.SetBool("Sit_b", true); // Make dog sit in menu
+        }
+    }
+
     void DisableGameplayComponents(GameObject obj)
     {
         // Disable common gameplay components that shouldn't run in menu
@@ -1174,34 +1279,64 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         customizeGroup.alpha = 0;
         customizeGroup.blocksRaycasts = false;
 
-        // LEFT SIDE - Team selection
+        // LEFT SIDE - Team selection (scaled up for readability)
         var leftPanel = new GameObject("LeftPanel");
         leftPanel.transform.SetParent(panel.transform, false);
         var leftRect = leftPanel.AddComponent<RectTransform>();
         leftRect.anchorMin = new Vector2(0, 0.5f);
         leftRect.anchorMax = new Vector2(0, 0.5f);
         leftRect.pivot = new Vector2(0, 0.5f);
-        leftRect.anchoredPosition = new Vector2(300, 0);
-        leftRect.sizeDelta = new Vector2(180, 300);
+        leftRect.anchoredPosition = new Vector2(80, 0);
+        leftRect.sizeDelta = new Vector2(320, 500);
         var leftBg = leftPanel.AddComponent<Image>();
-        leftBg.sprite = CreateRoundedRectSprite(180, 300, 15);
+        leftBg.sprite = CreateRoundedRectSprite(320, 500, 20);
         leftBg.type = Image.Type.Sliced;
-        leftBg.color = new Color(0.05f, 0.05f, 0.08f, 0.85f);
+        leftBg.color = new Color(0.05f, 0.05f, 0.08f, 0.9f);
 
         // Title on left
-        var title = CreateTMP(leftPanel.transform, "CUSTOMIZE", 20, FontStyles.Bold, textWhite);
-        title.rectTransform.anchoredPosition = new Vector2(0, 120);
-        title.rectTransform.sizeDelta = new Vector2(160, 35);
+        var title = CreateTMP(leftPanel.transform, "CUSTOMIZE", 32, FontStyles.Bold, textWhite);
+        title.rectTransform.anchoredPosition = new Vector2(0, 210);
+        title.rectTransform.sizeDelta = new Vector2(280, 50);
+
+        // Mode tabs (CHARACTER / WEAPONS) - positioned right below title
+        var modeTabContainer = new GameObject("ModeTabContainer");
+        modeTabContainer.transform.SetParent(leftPanel.transform, false);
+        var modeContainerRect = modeTabContainer.AddComponent<RectTransform>();
+        modeContainerRect.anchoredPosition = new Vector2(0, 155);
+        modeContainerRect.sizeDelta = new Vector2(280, 50);
+
+        var characterModeTab = CreateTeamTab(modeTabContainer.transform, "CHARACTER", new Vector2(-72, 0), true);
+        characterModeTab.GetComponent<RectTransform>().sizeDelta = new Vector2(135, 45);
+        characterModeTab.GetComponentInChildren<TextMeshProUGUI>().fontSize = 16;
+
+        var weaponsModeTab = CreateTeamTab(modeTabContainer.transform, "WEAPONS", new Vector2(72, 0), false);
+        weaponsModeTab.GetComponent<RectTransform>().sizeDelta = new Vector2(135, 45);
+        weaponsModeTab.GetComponentInChildren<TextMeshProUGUI>().fontSize = 16;
+
+        Debug.Log("[MainMenuUI] Created mode tabs: CHARACTER and WEAPONS");
+
+        // Character customization content container
+        var characterContent = new GameObject("CharacterContent");
+        characterContent.transform.SetParent(leftPanel.transform, false);
+        var charContentRect = characterContent.AddComponent<RectTransform>();
+        charContentRect.anchorMin = Vector2.zero;
+        charContentRect.anchorMax = Vector2.one;
+        charContentRect.sizeDelta = Vector2.zero;
 
         // Team label
-        var teamLabel = CreateTMP(leftPanel.transform, "TEAM", 11, FontStyles.Bold, textGray);
-        teamLabel.rectTransform.anchoredPosition = new Vector2(0, 70);
-        teamLabel.rectTransform.sizeDelta = new Vector2(160, 20);
+        var teamLabel = CreateTMP(characterContent.transform, "TEAM", 18, FontStyles.Bold, textGray);
+        teamLabel.rectTransform.anchoredPosition = new Vector2(0, 80);
+        teamLabel.rectTransform.sizeDelta = new Vector2(280, 30);
         teamLabel.characterSpacing = 3;
 
         // Team tabs stacked vertically
-        var phantomTab = CreateTeamTab(leftPanel.transform, "PHANTOM", new Vector2(0, 30), true);
-        var havocTab = CreateTeamTab(leftPanel.transform, "HAVOC", new Vector2(0, -20), false);
+        var phantomTab = CreateTeamTab(characterContent.transform, "PHANTOM", new Vector2(0, 30), true);
+        phantomTab.GetComponent<RectTransform>().sizeDelta = new Vector2(260, 50);
+        phantomTab.GetComponentInChildren<TextMeshProUGUI>().fontSize = 18;
+
+        var havocTab = CreateTeamTab(characterContent.transform, "HAVOC", new Vector2(0, -30), false);
+        havocTab.GetComponent<RectTransform>().sizeDelta = new Vector2(260, 50);
+        havocTab.GetComponentInChildren<TextMeshProUGUI>().fontSize = 18;
 
         phantomTab.onClick.AddListener(() => {
             selectedCustomizeTeam = "Phantom";
@@ -1215,20 +1350,452 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
             SwitchShowcaseCharacter();
         });
 
-        // Hint text
-        var hint = CreateTMP(leftPanel.transform, "Click on character\nto customize", 12, FontStyles.Normal, textGray);
-        hint.rectTransform.anchoredPosition = new Vector2(0, -80);
-        hint.rectTransform.sizeDelta = new Vector2(160, 50);
+        // K-9 Companion selector
+        var dogLabel = CreateTMP(characterContent.transform, "K-9 COMPANION", 18, FontStyles.Bold, textGray);
+        dogLabel.rectTransform.anchoredPosition = new Vector2(0, -90);
+        dogLabel.rectTransform.sizeDelta = new Vector2(280, 30);
+        dogLabel.characterSpacing = 2;
+
+        // Dog selector row
+        var dogSelectorRow = new GameObject("DogSelector");
+        dogSelectorRow.transform.SetParent(characterContent.transform, false);
+        var dogRowRect = dogSelectorRow.AddComponent<RectTransform>();
+        dogRowRect.anchoredPosition = new Vector2(0, -135);
+        dogRowRect.sizeDelta = new Vector2(280, 45);
+
+        var dogLeftBtn = CreateArrowButton(dogSelectorRow.transform, "<", new Vector2(-115, 0));
+        dogLeftBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(50, 45);
+        dogLeftBtn.GetComponentInChildren<TextMeshProUGUI>().fontSize = 24;
+
+        var dogValueText = CreateTMP(dogSelectorRow.transform, "German Shepherd", 16, FontStyles.Normal, textWhite);
+        dogValueText.rectTransform.anchoredPosition = Vector2.zero;
+        dogValueText.rectTransform.sizeDelta = new Vector2(160, 45);
+
+        var dogRightBtn = CreateArrowButton(dogSelectorRow.transform, ">", new Vector2(115, 0));
+        dogRightBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(50, 45);
+        dogRightBtn.GetComponentInChildren<TextMeshProUGUI>().fontSize = 24;
+
+        // Update dog display
+        System.Action updateDogDisplay = () => {
+            if (characterCustomizer != null)
+            {
+                int idx = characterCustomizer.GetSelection(selectedCustomizeTeam, "Dog");
+                dogValueText.text = characterCustomizer.GetOptionName(selectedCustomizeTeam, "Dog", idx);
+            }
+        };
+
+        dogLeftBtn.onClick.AddListener(() => {
+            if (characterCustomizer != null)
+            {
+                characterCustomizer.CycleSelection(selectedCustomizeTeam, "Dog", -1);
+                updateDogDisplay();
+                SpawnShowcaseDog(selectedCustomizeTeam);
+            }
+        });
+
+        dogRightBtn.onClick.AddListener(() => {
+            if (characterCustomizer != null)
+            {
+                characterCustomizer.CycleSelection(selectedCustomizeTeam, "Dog", 1);
+                updateDogDisplay();
+                SpawnShowcaseDog(selectedCustomizeTeam);
+            }
+        });
+
+        // Initial update
+        updateDogDisplay();
+
+        // === WEAPON CUSTOMIZATION CONTENT ===
+        var weaponContent = new GameObject("WeaponContent");
+        weaponContent.transform.SetParent(leftPanel.transform, false);
+        var weaponContentRect = weaponContent.AddComponent<RectTransform>();
+        weaponContentRect.anchorMin = Vector2.zero;
+        weaponContentRect.anchorMax = Vector2.one;
+        weaponContentRect.sizeDelta = Vector2.zero;
+        weaponContent.SetActive(false); // Hidden by default
+        weaponEditorPanel = weaponContent;
+
+        // Loadout slots
+        var loadoutLabel = CreateTMP(weaponContent.transform, "LOADOUT", 18, FontStyles.Bold, textGray);
+        loadoutLabel.rectTransform.anchoredPosition = new Vector2(0, 80);
+        loadoutLabel.rectTransform.sizeDelta = new Vector2(280, 30);
+        loadoutLabel.characterSpacing = 3;
+
+        var loadoutRow = new GameObject("LoadoutRow");
+        loadoutRow.transform.SetParent(weaponContent.transform, false);
+        var loadoutRowRect = loadoutRow.AddComponent<RectTransform>();
+        loadoutRowRect.anchoredPosition = new Vector2(0, 35);
+        loadoutRowRect.sizeDelta = new Vector2(280, 45);
+
+        Button[] loadoutBtns = new Button[5];
+        for (int i = 0; i < 5; i++)
+        {
+            int idx = i;
+            var slotBtn = new GameObject($"Loadout{i + 1}");
+            slotBtn.transform.SetParent(loadoutRow.transform, false);
+            var slotRect = slotBtn.AddComponent<RectTransform>();
+            slotRect.anchoredPosition = new Vector2(-100 + i * 50, 0);
+            slotRect.sizeDelta = new Vector2(44, 44);
+
+            var slotBg = slotBtn.AddComponent<Image>();
+            slotBg.color = i == 0 ? accentOrange : new Color(0.2f, 0.2f, 0.25f);
+
+            var slotBtnComp = slotBtn.AddComponent<Button>();
+            loadoutBtns[i] = slotBtnComp;
+
+            var slotLabel = CreateTMP(slotBtn.transform, (i + 1).ToString(), 20, FontStyles.Bold, i == 0 ? bgDark : textWhite);
+            slotLabel.rectTransform.anchorMin = Vector2.zero;
+            slotLabel.rectTransform.anchorMax = Vector2.one;
+            slotLabel.rectTransform.sizeDelta = Vector2.zero;
+
+            slotBtnComp.onClick.AddListener(() => {
+                currentEditingLoadout = idx;
+                if (weaponCustomizer != null)
+                {
+                    weaponCustomizer.SetCurrentLoadout(idx);
+                    weaponCustomizer.SetActiveLoadout(idx); // Also set as active so it's saved for in-game use
+                }
+                for (int j = 0; j < 5; j++)
+                {
+                    var bg = loadoutBtns[j].GetComponent<Image>();
+                    var lbl = loadoutBtns[j].GetComponentInChildren<TextMeshProUGUI>();
+                    bg.color = j == idx ? accentOrange : new Color(0.2f, 0.2f, 0.25f);
+                    lbl.color = j == idx ? bgDark : textWhite;
+                }
+                RefreshWeaponPreview();
+                UpdateWeaponStatsDisplay();
+            });
+        }
+
+        // Platform selector
+        var platformLabel = CreateTMP(weaponContent.transform, "PLATFORM", 18, FontStyles.Bold, textGray);
+        platformLabel.rectTransform.anchoredPosition = new Vector2(0, -20);
+        platformLabel.rectTransform.sizeDelta = new Vector2(280, 30);
+        platformLabel.characterSpacing = 3;
+
+        var platformRow = new GameObject("PlatformRow");
+        platformRow.transform.SetParent(weaponContent.transform, false);
+        var platformRowRect = platformRow.AddComponent<RectTransform>();
+        platformRowRect.anchoredPosition = new Vector2(0, -60);
+        platformRowRect.sizeDelta = new Vector2(280, 45);
+
+        var platformABtn = CreateTeamTab(platformRow.transform, "TYPE A", new Vector2(-72, 0), true);
+        platformABtn.GetComponent<RectTransform>().sizeDelta = new Vector2(135, 45);
+        platformABtn.GetComponentInChildren<TextMeshProUGUI>().fontSize = 16;
+
+        var platformBBtn = CreateTeamTab(platformRow.transform, "TYPE B", new Vector2(72, 0), false);
+        platformBBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(135, 45);
+        platformBBtn.GetComponentInChildren<TextMeshProUGUI>().fontSize = 16;
+
+        platformABtn.onClick.AddListener(() => {
+            if (weaponCustomizer != null && weaponCustomizer.GetCurrentPlatform() != "Weapon_A")
+            {
+                weaponCustomizer.SetPlatform("Weapon_A");
+                UpdateTeamTabs(platformABtn, platformBBtn);
+                RefreshWeaponPreview();
+                UpdateWeaponStatsDisplay();
+            }
+        });
+
+        platformBBtn.onClick.AddListener(() => {
+            if (weaponCustomizer != null && weaponCustomizer.GetCurrentPlatform() != "Weapon_B")
+            {
+                weaponCustomizer.SetPlatform("Weapon_B");
+                UpdateTeamTabs(platformBBtn, platformABtn);
+                RefreshWeaponPreview();
+                UpdateWeaponStatsDisplay();
+            }
+        });
+
+        // Weapon preset selector (simplified - cycle through complete weapons)
+        var weaponLabel = CreateTMP(weaponContent.transform, "WEAPON", 18, FontStyles.Bold, textGray);
+        weaponLabel.rectTransform.anchoredPosition = new Vector2(0, -115);
+        weaponLabel.rectTransform.sizeDelta = new Vector2(280, 30);
+        weaponLabel.characterSpacing = 3;
+
+        // Weapon selector row
+        var weaponSelectorRow = new GameObject("WeaponSelector");
+        weaponSelectorRow.transform.SetParent(weaponContent.transform, false);
+        var weaponSelectorRect = weaponSelectorRow.AddComponent<RectTransform>();
+        weaponSelectorRect.anchoredPosition = new Vector2(0, -160);
+        weaponSelectorRect.sizeDelta = new Vector2(280, 50);
+
+        var weaponLeftBtn = CreateArrowButton(weaponSelectorRow.transform, "<", new Vector2(-125, 0));
+        weaponLeftBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(50, 50);
+        weaponLeftBtn.GetComponentInChildren<TextMeshProUGUI>().fontSize = 28;
+
+        currentPartLabel = CreateTMP(weaponSelectorRow.transform, "Rifle", 16, FontStyles.Bold, accentOrange);
+        currentPartLabel.rectTransform.anchoredPosition = Vector2.zero;
+        currentPartLabel.rectTransform.sizeDelta = new Vector2(180, 50);
+
+        var weaponRightBtn = CreateArrowButton(weaponSelectorRow.transform, ">", new Vector2(125, 0));
+        weaponRightBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(50, 50);
+        weaponRightBtn.GetComponentInChildren<TextMeshProUGUI>().fontSize = 28;
+
+        // Weapon count display
+        currentPartValue = CreateTMP(weaponContent.transform, "1 / 20", 14, FontStyles.Normal, textGray);
+        currentPartValue.rectTransform.anchoredPosition = new Vector2(0, -195);
+        currentPartValue.rectTransform.sizeDelta = new Vector2(280, 25);
+
+        // Weapon cycling
+        weaponLeftBtn.onClick.AddListener(() => {
+            if (weaponCustomizer != null)
+            {
+                weaponCustomizer.CyclePreset(-1);
+                UpdateWeaponPresetDisplay();
+                RefreshWeaponPreview();
+                UpdateWeaponStatsDisplay();
+            }
+        });
+
+        weaponRightBtn.onClick.AddListener(() => {
+            if (weaponCustomizer != null)
+            {
+                weaponCustomizer.CyclePreset(1);
+                UpdateWeaponPresetDisplay();
+                RefreshWeaponPreview();
+                UpdateWeaponStatsDisplay();
+            }
+        });
+
+        // Mode switching logic
+        characterModeTab.onClick.AddListener(() => {
+            isCustomizingWeapon = false;
+            characterContent.SetActive(true);
+            weaponContent.SetActive(false);
+            UpdateTeamTabs(characterModeTab, weaponsModeTab);
+
+            // Show character preview
+            if (playerShowcaseCharacter != null) playerShowcaseCharacter.SetActive(true);
+            if (showcaseDog != null) showcaseDog.SetActive(true);
+            if (weaponPreview != null) weaponPreview.SetActive(false);
+
+            // Hide stats panel
+            var statsPanel = characterContent.transform.parent.parent.Find("WeaponStatsPanel");
+            if (statsPanel != null) statsPanel.gameObject.SetActive(false);
+        });
+
+        weaponsModeTab.onClick.AddListener(() => {
+            isCustomizingWeapon = true;
+            characterContent.SetActive(false);
+            weaponContent.SetActive(true);
+            UpdateTeamTabs(weaponsModeTab, characterModeTab);
+
+            // Show weapon preview instead of character
+            if (playerShowcaseCharacter != null) playerShowcaseCharacter.SetActive(false);
+            if (showcaseDog != null) showcaseDog.SetActive(false);
+            SpawnWeaponPreview();
+            UpdateWeaponPartDisplay();
+            UpdateWeaponStatsDisplay();
+
+            // Show stats panel
+            var statsPanel = weaponContent.transform.parent.parent.Find("WeaponStatsPanel");
+            if (statsPanel != null) statsPanel.gameObject.SetActive(true);
+        });
 
         // Done button at bottom of left panel
-        var doneBtn = CreateButton(leftPanel.transform, "DONE", new Vector2(0, -130), true);
-        doneBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(140, 40);
+        var doneBtn = CreateButton(leftPanel.transform, "DONE", new Vector2(0, -220), true);
+        doneBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 55);
+        doneBtn.GetComponentInChildren<TextMeshProUGUI>().fontSize = 20;
         doneBtn.onClick.AddListener(ExitCustomizeMode);
+
+        // === STATS PANEL (Right side for weapon mode) ===
+        BuildWeaponStatsPanel(panel.transform);
 
         // Create body part popup (hidden by default) - will appear near character
         BuildBodyPartPopup(parent);
 
         Debug.Log($"[MainMenuUI] BuildCustomizePanel complete");
+    }
+
+    void BuildWeaponStatsPanel(Transform parent)
+    {
+        var statsPanel = new GameObject("WeaponStatsPanel");
+        statsPanel.transform.SetParent(parent, false);
+        var statsRect = statsPanel.AddComponent<RectTransform>();
+        statsRect.anchorMin = new Vector2(1, 0.5f);
+        statsRect.anchorMax = new Vector2(1, 0.5f);
+        statsRect.pivot = new Vector2(1, 0.5f);
+        statsRect.anchoredPosition = new Vector2(-80, 0);
+        statsRect.sizeDelta = new Vector2(300, 450);
+
+        var statsBg = statsPanel.AddComponent<Image>();
+        statsBg.sprite = CreateRoundedRectSprite(300, 450, 20);
+        statsBg.type = Image.Type.Sliced;
+        statsBg.color = new Color(0.05f, 0.05f, 0.08f, 0.9f);
+        statsPanel.SetActive(false); // Show only in weapon mode
+
+        var statsTitle = CreateTMP(statsPanel.transform, "STATS", 24, FontStyles.Bold, textWhite);
+        statsTitle.rectTransform.anchoredPosition = new Vector2(0, 190);
+        statsTitle.rectTransform.sizeDelta = new Vector2(260, 40);
+
+        string[] statNames = { "DAMAGE", "FIRE RATE", "RANGE", "ACCURACY", "RECOIL", "MOBILITY" };
+        statBarLabels = new TextMeshProUGUI[statNames.Length];
+        statBarFills = new Image[statNames.Length];
+
+        for (int i = 0; i < statNames.Length; i++)
+        {
+            float yPos = 130 - i * 55;
+
+            var label = CreateTMP(statsPanel.transform, statNames[i], 14, FontStyles.Bold, textGray);
+            label.rectTransform.anchoredPosition = new Vector2(0, yPos + 15);
+            label.rectTransform.sizeDelta = new Vector2(260, 22);
+            label.alignment = TextAlignmentOptions.Left;
+            statBarLabels[i] = label;
+
+            // Bar background
+            var barBg = CreateImage(statsPanel.transform, $"StatBg_{i}", new Color(0.15f, 0.15f, 0.18f));
+            barBg.rectTransform.anchoredPosition = new Vector2(0, yPos - 8);
+            barBg.rectTransform.sizeDelta = new Vector2(260, 14);
+
+            // Bar fill
+            var barFill = CreateImage(statsPanel.transform, $"StatFill_{i}", accentOrange);
+            barFill.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            barFill.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            barFill.rectTransform.pivot = new Vector2(0, 0.5f);
+            barFill.rectTransform.anchoredPosition = new Vector2(-130, yPos - 8);
+            barFill.rectTransform.sizeDelta = new Vector2(130, 14); // 50% fill default
+            statBarFills[i] = barFill;
+        }
+    }
+
+    void SpawnWeaponPreview()
+    {
+        if (weaponPreview != null)
+        {
+            Destroy(weaponPreview);
+            weaponPreview = null;
+        }
+
+        // Refresh reference if null
+        if (weaponCustomizer == null)
+        {
+            weaponCustomizer = WeaponCustomizer.Instance;
+        }
+        if (weaponCustomizer == null) return;
+
+        // Create weapon preview in the showcase area
+        if (showcaseModel != null)
+        {
+            weaponPreview = weaponCustomizer.CreatePreviewWeapon(showcaseModel.transform);
+            if (weaponPreview != null)
+            {
+                weaponPreview.transform.localPosition = new Vector3(0, 0.8f, 0.5f);
+                weaponPreview.transform.localRotation = Quaternion.Euler(0, 180, 0);
+                weaponPreview.transform.localScale = Vector3.one * 2f; // Scale for visibility
+            }
+        }
+
+        // Show stats panel
+        if (weaponEditorPanel != null && weaponEditorPanel.transform.parent != null)
+        {
+            var statsPanel = weaponEditorPanel.transform.parent.parent.Find("WeaponStatsPanel");
+            if (statsPanel != null) statsPanel.gameObject.SetActive(true);
+        }
+
+        UpdateWeaponStatsDisplay();
+    }
+
+    void RefreshWeaponPreview()
+    {
+        if (!isCustomizingWeapon)
+        {
+            Debug.Log("[MainMenuUI] RefreshWeaponPreview: Not in weapon mode");
+            return;
+        }
+        // Refresh reference if null
+        if (weaponCustomizer == null)
+        {
+            weaponCustomizer = WeaponCustomizer.Instance;
+        }
+        if (weaponCustomizer == null)
+        {
+            Debug.LogWarning("[MainMenuUI] RefreshWeaponPreview: weaponCustomizer is null!");
+            return;
+        }
+
+        if (weaponPreview != null)
+        {
+            Destroy(weaponPreview);
+        }
+
+        if (showcaseModel != null)
+        {
+            Debug.Log("[MainMenuUI] Creating weapon preview...");
+            weaponPreview = weaponCustomizer.CreatePreviewWeapon(showcaseModel.transform);
+            if (weaponPreview != null)
+            {
+                weaponPreview.transform.localPosition = new Vector3(0, 0.8f, 0.5f);
+                weaponPreview.transform.localRotation = Quaternion.Euler(0, 180, 0);
+                weaponPreview.transform.localScale = Vector3.one * 2f;
+                Debug.Log("[MainMenuUI] Weapon preview created successfully");
+            }
+            else
+            {
+                Debug.LogWarning("[MainMenuUI] Weapon preview is null - check WeaponCustomizer has prefabs assigned");
+            }
+        }
+    }
+
+    void UpdateWeaponPresetDisplay()
+    {
+        // Refresh reference if null (original may have been destroyed when creating persistent copy)
+        if (weaponCustomizer == null)
+        {
+            weaponCustomizer = WeaponCustomizer.Instance;
+        }
+        if (weaponCustomizer == null)
+        {
+            Debug.LogWarning("[MainMenuUI] UpdateWeaponPresetDisplay: weaponCustomizer is null!");
+            if (currentPartValue != null) currentPartValue.text = "No Customizer";
+            return;
+        }
+        if (currentPartLabel == null || currentPartValue == null) return;
+
+        string presetName = weaponCustomizer.GetCurrentPresetName();
+        int idx = weaponCustomizer.GetCurrentPresetIndex();
+        int count = weaponCustomizer.GetPresetCount();
+
+        currentPartLabel.text = presetName;
+        currentPartValue.text = $"{idx + 1} / {count}";
+        Debug.Log($"[MainMenuUI] Preset display: {presetName} ({idx + 1}/{count})");
+    }
+
+    void UpdateWeaponPartDisplay()
+    {
+        // Redirect to preset display
+        UpdateWeaponPresetDisplay();
+    }
+
+    void UpdateWeaponStatsDisplay()
+    {
+        // Refresh reference if null
+        if (weaponCustomizer == null)
+        {
+            weaponCustomizer = WeaponCustomizer.Instance;
+        }
+        if (weaponCustomizer == null || statBarFills == null) return;
+
+        var stats = weaponCustomizer.GetCurrentStats();
+        if (stats == null) return;
+
+        // Normalize stats to 0-1 range for bar display
+        float[] normalized = {
+            Mathf.Clamp01(stats.damage / 50f),           // Max damage ~50
+            Mathf.Clamp01((1f / stats.fireRate) / 15f),  // Convert to RPM-ish, max ~15
+            Mathf.Clamp01(stats.range / 150f),           // Max range ~150
+            Mathf.Clamp01(stats.accuracy),               // Already 0-1
+            Mathf.Clamp01(1f - (stats.recoilVertical / 5f)), // Invert - less recoil is better
+            Mathf.Clamp01(stats.moveSpeedMultiplier)     // Already 0-1
+        };
+
+        for (int i = 0; i < statBarFills.Length && i < normalized.Length; i++)
+        {
+            if (statBarFills[i] != null)
+            {
+                statBarFills[i].rectTransform.sizeDelta = new Vector2(260 * normalized[i], 14);
+            }
+        }
     }
 
     void BuildBodyPartPopup(Transform parent)
@@ -1355,6 +1922,9 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         SetupShowcaseSoldier(playerShowcaseCharacter);
         SetupCharacterClickZones();
         ApplyShowcaseAttachments(selectedCustomizeTeam);
+
+        // Also update the dog for the new team
+        SpawnShowcaseDog(selectedCustomizeTeam);
     }
 
     void SetupCharacterClickZones()
@@ -1439,8 +2009,26 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
         {
             characterCustomizer.SaveAllSelections();
         }
+        if (weaponCustomizer != null)
+        {
+            weaponCustomizer.SaveAllLoadouts();
+        }
         HideBodyPartPopup();
         isCustomizing = false;
+        isCustomizingWeapon = false;
+
+        // Clean up weapon preview and restore character
+        if (weaponPreview != null)
+        {
+            Destroy(weaponPreview);
+            weaponPreview = null;
+        }
+        if (playerShowcaseCharacter != null) playerShowcaseCharacter.SetActive(true);
+        if (showcaseDog != null) showcaseDog.SetActive(true);
+
+        // Hide weapon stats panel
+        var statsPanel = customizeGroup?.transform.Find("WeaponStatsPanel");
+        if (statsPanel != null) statsPanel.gameObject.SetActive(false);
 
         // Animate camera back
         StartCoroutine(AnimateCameraTo(menuCameraPos, menuCameraRot, menuCameraFOV, 0.5f));
@@ -1970,7 +2558,27 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
 
         ShowPanel(loadingGroup);
         loadProgress = 0f;
+
+        // Join or create a room, then load scene in OnJoinedRoom
+        RoomOptions roomOptions = new RoomOptions();
+        roomOptions.MaxPlayers = 10;
+        roomOptions.IsVisible = true;
+        roomOptions.IsOpen = true;
+        PhotonNetwork.JoinOrCreateRoom("KlyraFPS_Main", roomOptions, TypedLobby.Default);
+    }
+
+    public override void OnJoinedRoom()
+    {
+        Debug.Log($"[MainMenuUI] Joined room: {PhotonNetwork.CurrentRoom.Name}");
         StartCoroutine(LoadGame());
+    }
+
+    public override void OnJoinRoomFailed(short returnCode, string message)
+    {
+        Debug.LogError($"[MainMenuUI] Failed to join room: {message}");
+        ShowPanel(mainMenuGroup);
+        statusText.text = "FAILED TO JOIN";
+        statusText.color = new Color(1f, 0.4f, 0.3f);
     }
 
     void OnCustomize()
@@ -2031,7 +2639,31 @@ public class MainMenuUI : MonoBehaviourPunCallbacks
 
     IEnumerator LoadGame()
     {
-        yield return new WaitForSeconds(0.5f);
+        // Small delay before starting load
+        yield return new WaitForSeconds(0.3f);
+
+        // Start loading the game scene
         PhotonNetwork.LoadLevel(gameSceneName);
+
+        // Wait for Photon to start the level load
+        yield return new WaitForSeconds(0.1f);
+
+        // Track loading progress
+        while (PhotonNetwork.LevelLoadingProgress < 1f)
+        {
+            loadProgress = PhotonNetwork.LevelLoadingProgress;
+            yield return null;
+        }
+
+        // Loading complete - ensure bar is full
+        loadProgress = 1f;
+        yield return new WaitForSeconds(0.2f);
+
+        // Hide loading panel (in case scene transition hasn't destroyed us yet)
+        if (loadingGroup != null)
+        {
+            loadingGroup.alpha = 0;
+            loadingGroup.blocksRaycasts = false;
+        }
     }
 }
